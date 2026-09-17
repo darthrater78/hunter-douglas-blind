@@ -25,9 +25,12 @@ blocked rather than skipped.
 CI is green on `1a99674`, `9e7760c`, `dac12fe` and `1a99a41`, each through
 `assembleRelease` with R8 (which is where `lintVitalRelease` runs).
 
-**`3fe7a27` (the weekly battery sweep) was pushed at the end of the session and
-its run was still in flight.** That commit's Android code has not been seen by a
-compiler. Confirm it before building anything on top of it.
+**The weekly battery sweep (`3fe7a27`) was pushed at the end of the session and
+its run was still in flight.** Confirm it before building on top of it — but
+check the run for `e0d459b`, the newest commit, not for `3fe7a27`: CI cancels
+in-progress runs per ref, so the sweep's own run was almost certainly cancelled
+by the following push. A cancelled run is not a failure, and `e0d459b` covers
+the same code.
 
 The Android modules still cannot be compiled in this container (no SDK; Google
 Maven unreachable). What *can* be checked locally has grown, and is worth using:

@@ -237,9 +237,15 @@ Also verifiable locally: workflow files with `actionlint`.
 CI is green on `1a99674`, `9e7760c`, `dac12fe` and `1a99a41` — including
 `assembleRelease` with R8, which is where `lintVitalRelease` runs.
 
-`3fe7a27` (the battery sweep) was pushed at the end of the session and **its run
-was still in flight**. It is the one commit here whose Android code has not been
-seen by a compiler. Check it first:
+`3fe7a27` (the battery sweep) was pushed at the end of the session and its run
+was still in flight when the session ended. It is the one commit here whose
+Android code had not yet been seen by a compiler.
+
+**Check the run for `e0d459b` (the newest commit), not for `3fe7a27`.** CI sets
+`cancel-in-progress: true` on a per-ref concurrency group, so pushing the
+handoff commit will have cancelled the sweep's own run mid-flight. A cancelled
+run is not a failure. `e0d459b` contains the same sweep code plus documentation,
+so its result is the authoritative one:
 
 ```
 https://github.com/darthrater78/hunter-douglas-blind/actions
