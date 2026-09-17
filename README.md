@@ -13,6 +13,10 @@ understanding it.
 
 ## Status
 
+**See [`docs/HANDOFF.md`](docs/HANDOFF.md) first** — it records what is
+confirmed against real hardware versus merely assumed, which is the distinction
+that matters most in this project, plus the next step and its open decision.
+
 Starting framework. `:protocol` (advertisement parsing, command frame
 encoding, AES-CTR keystream handling, capability lookup) is fully
 implemented and unit-tested against real sniffed test vectors — see
@@ -77,17 +81,19 @@ GitHub-hosted runner, which has the SDK preinstalled.
 
 ## Versions that need confirming before the first full build
 
-`gradle/libs.versions.toml` marks each dependency `VERIFIED` (checked
-against Maven Central in-session) or `UNVERIFIED`. The AGP and every
-AndroidX version are `UNVERIFIED` because this container's network policy
-blocks `dl.google.com`/`maven.google.com` — the only place that metadata is
-published — so those numbers are reasonable-but-unconfirmed placeholders,
-not looked-up facts. Confirm against
+`gradle/libs.versions.toml` marks each dependency `VERIFIED` (looked up
+against Maven Central) or `UNVERIFIED`. AGP and every AndroidX line are
+`UNVERIFIED` because the container that scaffolded this project could not reach
+`dl.google.com`/`maven.google.com`, the only place that metadata is published.
+
+**That marker now means less than it used to.** CI has built the whole project
+green with these versions, so they demonstrably exist and work together. What
+remains unknown is whether they are *current*. Check
 [the AGP release notes](https://developer.android.com/build/releases/gradle-plugin)
-and [AndroidX release notes](https://developer.android.com/jetpack/androidx/versions)
-before relying on a full build, then remove the `UNVERIFIED` markers.
-Kotlin, kotlinx-coroutines and kotlinx-serialization-json are `VERIFIED`
-(Maven Central, reachable from this container).
+and [AndroidX release notes](https://developer.android.com/jetpack/androidx/versions),
+then drop the markers. `agp` and `compileSdk`/`targetSdk` deserve the most
+attention — targetSdk 35 may already be at or below the Play Store's floor.
+Dependabot is configured and can finally open PRs for these, now that CI runs.
 
 `androidx.security:security-crypto` (used by `KeystreamStore`, the encrypted
 keystream storage) has historically only shipped pre-1.0 / alpha releases
