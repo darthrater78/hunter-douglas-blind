@@ -289,6 +289,57 @@ because the plan was wrong in three places and only building them showed it.
 | #1 | `minor-and-patch` ×5 | merged, after AGP 9 + compileSdk 37 |
 | #6 | compose-bom → `2026.09.00` | merged, same |
 
+### What it did not do: fix a single vulnerability
+
+Worth being blunt about, because "cleared the Dependabot queue" reads like
+security work and this was not that. **No known vulnerability was fixed,
+because none was ever reported.** GitHub has two separate Dependabot features
+and this repository has only one of them switched on:
+
+- **Version updates** — driven by `.github/dependabot.yml`, scheduled weekly.
+  On. All seven PRs were these.
+- **Security updates / alerts** — driven by the GitHub Advisory Database,
+  raised only when a dependency matches a published advisory. **Off.** The API
+  says so outright:
+
+```
+GET /repos/darthrater78/hunter-douglas-blind/dependabot/alerts
+403  "Dependabot alerts are disabled for this repository."
+```
+
+No CVE or GHSA identifier appears anywhere in the seven PR bodies; the only
+occurrence of the word "vulnerabilities" is inside a boilerplate badge URL. So
+by construction the sweep could not have fixed one.
+
+Two claims that are easy to conflate, and should not be:
+
+- `androidx.security:security-crypto` alpha06 → stable 1.1.0 is a **supply
+  chain maturity** improvement — a pre-release library guarding the app's only
+  credential — **not** a patch for a known exploit. The package having
+  "security" in its name makes the stronger reading tempting.
+- The gate file's "0 Critical / 0 High" is a review of the **diff**, which is
+  what dev-skills means by that gate. It is **not** a CVE scan of the
+  dependency tree, and no such scan has ever run here — Gradle cannot resolve
+  the Android tree with `dl.google.com` blocked.
+
+What the sweep genuinely bought is **currency**, which lowers future exposure
+without measuring present exposure. The honest status of this project's
+dependencies is *unknown*, not *clean*.
+
+**The fix is a repository setting, and only the owner can flip it:** Settings →
+Code security → enable **Dependabot alerts** and **Dependabot security
+updates**. Until that is on, nothing is watching this project for CVEs at all,
+and dev-skills §4.1 expects exactly that watch. A one-off `osv-scanner` run
+from a machine that can reach Google Maven would give a present-tense answer
+for the tree as it stands.
+
+The security-shaped work that *was* done this session was defensive rather than
+remedial: both action SHAs resolved against their upstream tags, the
+`setup-gradle` pin caught claiming v4.4.4 while pointing at v4.4.3, and the
+widened trigger confirmed to be `pull_request` rather than `pull_request_target`
+(read-only token, no secrets, so a fork PR cannot reach anything). Useful, and
+none of it a vulnerability fix.
+
 ### The three things the plan got wrong
 
 **1. Four of the seven had never been built.** Not red — *empty*. Their base

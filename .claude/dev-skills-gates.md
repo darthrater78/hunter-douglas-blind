@@ -76,12 +76,15 @@ logging, crypto surface or persisted value.
 
 Specifically reviewed:
 
-- **`androidx.security:security-crypto` alpha06 → stable 1.1.0 is a security
-  improvement**, and the most valuable item in the queue: it guards the only
-  credential in the app and step 5 is about to put a real keystream behind it.
-  It does *not* settle whether `EncryptedSharedPreferences` is the right home
-  for the keystream — Jetpack has been steering away from it. **That call is
-  still owed before any real release.**
+- **`androidx.security:security-crypto` alpha06 → stable 1.1.0 is a supply
+  chain maturity improvement, not a patch.** No CVE was involved. What it
+  addresses is that a *pre-release* library guarded the only credential in the
+  app, with step 5 about to put a real keystream behind it — a real concern of
+  the unsupported-dependency kind, and worth doing first for that reason. The
+  package having "security" in its name makes the stronger reading tempting;
+  resist it. It also does *not* settle whether `EncryptedSharedPreferences` is
+  the right home for the keystream — Jetpack has been steering away from it.
+  **That call is still owed before any real release.**
 - **Action pins were verified against upstream tags, not trusted.**
   `actions/setup-java@de7274f` = v6.0.1 and `actions/upload-artifact@043fb46` =
   v7.0.1, both resolved with `git ls-remote`. This is supply-chain review, and
@@ -94,13 +97,31 @@ Specifically reviewed:
   `release.yml`, which does handle signing secrets, triggers on tags only and
   was not touched. No escalation.
 
-**The honest gap: no dependency audit tool was run, and none can be.** §4.1
-wants the ecosystem's audit run against the current lockfile at every security
-gate. There is no lockfile (see below), and Gradle cannot resolve the Android
-dependency tree here at all, so no CVE check covers the AndroidX/AGP tree. What
-this session has instead is that every pin is now the current release, which
-lowers exposure but does not measure it. **Run a real audit from a machine with
-Google Maven before any release.**
+**The honest gap, and it is bigger than the container: nothing is watching
+this repository for CVEs at all.**
+
+Two separate limits, and the second is the one that matters:
+
+1. No dependency audit tool was run here, and none can be. §4.1 wants the
+   ecosystem's audit run against the current lockfile at every security gate.
+   There is no lockfile, and Gradle cannot resolve the Android tree with
+   `dl.google.com` blocked, so no CVE check covers the AndroidX/AGP tree.
+2. **Dependabot alerts are disabled for this repository.** Confirmed directly:
+   `GET /repos/.../dependabot/alerts` returns `403 "Dependabot alerts are
+   disabled for this repository."` The `dependabot.yml` here configures
+   *version updates* only — the weekly scheduled kind. The advisory-driven
+   *security updates* are a different feature and it is switched off.
+
+So the September 2026 sweep, which merged six PRs, **fixed no known
+vulnerability, because none was ever reported.** No CVE or GHSA identifier
+appears in any of the seven PR bodies. Every pin is now the current release,
+which lowers exposure without measuring it. The dependencies' status is
+*unknown*, not *clean*.
+
+**Owner action, not something Claude can do:** Settings → Code security →
+enable **Dependabot alerts** and **Dependabot security updates**. §4.1 calls
+for exactly that automated watch. Also run a real audit (`osv-scanner`) from a
+machine with Google Maven before any release.
 
 The full audit (1 Critical, 5 High, 11 Medium, 4 Low; all Critical and High
 fixed) predates roughly 2,000 lines of session-2 UI code that it never saw —
@@ -135,11 +156,15 @@ twice reconfirmed it stays last in the ordering, so it is now simply next. The
 decision still open on it (which of the three onboarding paths to build first,
 with import-a-known-key the standing recommendation) is in `docs/HANDOFF.md`.
 
-Two follow-ups the dependency sweep left behind. Neither blocks step 5, and
-neither is something CI can answer:
+Three follow-ups the dependency sweep left behind. None blocks step 5, and none
+is something CI can answer:
 
-1. **The built-in Kotlin migration**, before AGP 10.0 removes the opt-out. The
+1. **Enable Dependabot alerts** (Settings → Code security). This is the most
+   valuable of the three and takes a minute — right now nothing watches this
+   project for CVEs. It is a repository setting, so it needs the owner. See the
+   security notes above.
+2. **The built-in Kotlin migration**, before AGP 10.0 removes the opt-out. The
    steps are recorded in `gradle.properties` beside the flags; the open
    question is whether the Compose plugin pin must move with AGP's bundled
    Kotlin.
-2. **Look at the app under the Black (OLED) theme** after the Compose BOM jump.
+3. **Look at the app under the Black (OLED) theme** after the Compose BOM jump.

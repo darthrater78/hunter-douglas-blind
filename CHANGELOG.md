@@ -59,7 +59,17 @@ they had been queued in turned out to be wrong, for a reason worth recording.
   versus `refs/heads/<branch>` are different strings, and PRs #1 and #6 each
   built twice. It is `head_ref || ref_name` now.
 
-Still owed, and neither is something CI can answer: the built-in Kotlin
+**None of this fixed a known vulnerability, and it could not have.** All seven
+PRs were scheduled *version updates*; Dependabot's advisory-driven *security
+updates* are a separate feature and **alerts are disabled on this repository**
+(`GET /dependabot/alerts` → `403 "Dependabot alerts are disabled"`). No CVE or
+GHSA identifier appears in any of the seven. The `security-crypto` move off a
+pre-release is supply chain maturity, not a patch. Being current lowers future
+exposure without measuring present exposure — the dependency status is
+*unknown*, not *clean*. Enabling Dependabot alerts is a repository setting and
+the single highest-value follow-up here.
+
+Also owed, and neither is something CI can answer: the built-in Kotlin
 migration before AGP 10, and a **visual check of the Compose BOM jump** — two
 years of Material 3 moved at once, and the OLED theme leans on the
 `surfaceContainer` roles and `surfaceTint`. Green means it compiles, not that
