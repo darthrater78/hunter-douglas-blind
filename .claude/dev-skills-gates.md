@@ -4,8 +4,8 @@ Version: n/a — still pre-release, nothing tagged
 Updated: 2026-09-17 (session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ CI green through `0113457` (run #14); theme commit pending CI
-🔒 SECURITY   ✅ theme diff scanned, 0 Critical / 0 High — but see notes
+🔨 BUILD      ✅ CI green through `0113457`; theme + widget commits pending CI
+🔒 SECURITY   ✅ theme + widget diffs scanned, 0 Critical / 0 High — see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
 📦 RELEASE    ⬜ no PR open
 🚀 SHIP       ⬜ nothing tagged or released
@@ -36,12 +36,32 @@ Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
 compile error before CI this session.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 42 in `:ui`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 42 in `:ui`, 17 in `:widget`.
 
 ## Security gate notes
-**This session's theme work is scanned and clean** (0 Critical / 0 High). It
-adds no dependency, no permission, no network or crypto surface, no logging and
-no exported component; the one new persisted value is a theme name in its own
+**This session's work is scanned and clean** (0 Critical / 0 High).
+
+The widget (step 9) adds **two exported components**, which is the one thing
+here worth a reviewer's attention. Both have to be exported — a widget
+receiver that is not exported never receives `APPWIDGET_UPDATE`, and the
+launcher is what starts a configuration activity — so the question is what
+they accept. The receiver acts only on widget ids the system hands it. The
+configuration activity treats its `appWidgetId` extra as untrusted and checks
+it against the ids `GlanceAppWidgetManager` reports for this provider before
+writing anything, so another app cannot use it to rewrite a widget that is not
+ours; it holds no permission and exposes nothing beyond the user's own action
+labels. Neither touches BLE directly — both go through the existing
+`ActionRunner` funnel, which already never throws.
+
+Also new: `androidx.datastore.preferences`, `androidx.compose.runtime`,
+`compose-ui`, `material3`, `activity-compose` and `lifecycle-runtime-ktx` are
+now declared on `:widget`. No new artifact enters the build — every one was
+already resolved for another module, and they are declared here because this
+module's own code names them rather than relying on another module's
+`implementation` deps leaking onto the compile classpath.
+
+The theme work adds no dependency, no permission, no network or crypto
+surface, no logging and no exported component; the one new persisted value is a theme name in its own
 `app_settings` DataStore, which falls back to `SYSTEM` on an unrecognised
 value rather than throwing. It is deliberately a separate DataStore from the
 shade and action stores so a corrupt settings blob costs a theme choice rather

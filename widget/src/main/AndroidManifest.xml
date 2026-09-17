@@ -1,1 +1,48 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+          Fully-qualified class names, not the usual leading dot: this is a
+          library manifest, and a leading dot is resolved against the merged
+          application's package (com.scrivtech.powerview) rather than this
+          module's namespace, which would name classes that do not exist.
+
+          exported="true" is required, not a choice: the widget host sends
+          APPWIDGET_UPDATE from outside the app, and a non-exported receiver
+          would simply never run. It carries no permission and acts only on
+          widget ids the system hands it.
+        -->
+        <receiver
+            android:name="com.scrivtech.powerview.widget.ShadeActionWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/shade_action_widget_info" />
+        </receiver>
+
+        <!--
+          Also necessarily exported — the launcher starts it as part of
+          placing a widget. It treats its appWidgetId extra as untrusted and
+          checks it against the ids the system reports for this provider
+          before writing anything; see the class docs.
+
+          No android:theme: it inherits the application theme, so it matches
+          the app rather than pinning a second one that would have to be kept
+          in step with it.
+        -->
+        <activity
+            android:name="com.scrivtech.powerview.widget.WidgetConfigActivity"
+            android:exported="true"
+            android:label="@string/widget_config_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+    </application>
+</manifest>

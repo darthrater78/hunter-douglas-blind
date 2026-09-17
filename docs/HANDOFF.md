@@ -23,7 +23,8 @@ sliders are labelled with percentages rather than "Open" and "Close".
 **Nothing in this app can move a shade yet.** The one remaining blocker is
 keystream onboarding (step 5), which is deliberately last — the user
 reconfirmed that ordering when this session offered to start it. Do not pull
-it forward; build steps 6, 9 and 11 around it first. The UI is built to say so
+it forward; steps 9 and 11 are built around it, and step 6 is really part of
+onboarding anyway. The UI is built to say so
 out loud rather than failing opaquely — see "The no-keystream state" below.
 
 Build order progress (numbering follows the README):
@@ -38,9 +39,9 @@ Build order progress (numbering follows the README):
 | 6 Derive-from-capture, tilt, secondary | ⬜ core classes exist, no UI |
 | 7 Persistence, labels/rooms, actions | ✅ shade list, rooms, naming, action editor |
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
-| 9 Glance widgets | ⬜ TODO stubs only — **next** |
+| 9 Glance widgets | ✅ widget, grid, config activity, per-instance state |
 | 10 Battery sweep + notifications | ✅ weekly sweep, one summary notification |
-| 11 Quick Settings tile | ⬜ TODO stub only |
+| 11 Quick Settings tile | ⬜ TODO stub only — **next** |
 | 12 Home Assistant bridge | ⬜ optional |
 
 Appearance is not a build-order step. A theme picker (Follow system / Light /
@@ -51,7 +52,27 @@ why the OLED scheme's containers are not themselves black.
 
 ## What changed in the second session
 
-A theme picker with an OLED black option — not a build-order step, asked for
+**Step 9, the Glance widget.** One to six buttons per widget instance, a
+configuration activity to choose which saved actions they run, and results
+written back to every widget showing the action. Three things in it are worth
+knowing before touching it, all recorded in the CHANGELOG entry: it is
+deliberately *not* expedited WorkManager work (that crashes below API 31 at
+this project's `minSdk`), tap debounce is three layers deep because a
+duplicate tap costs shade battery, and a success clears the button rather than
+showing a tick, since the widget knows a frame was acknowledged and not that
+anything moved.
+
+Verifying it was the interesting part. The container has no Android SDK and no
+Glance to compile against, so every Glance call was checked against the
+AndroidX sources on GitHub before being written — which settled, among others,
+that `provideContent` is a top-level extension needing an import while
+`update` is a member needing none, and caught that a leading-dot class name in
+a *library* manifest resolves against the app's `applicationId` rather than
+the module's namespace, so the receiver and config activity are named in full.
+Everything that could be pulled out of Glance's way lives in
+`WidgetPresentation.kt` and is tested off-device.
+
+**A theme picker with an OLED black option** — not a build-order step, asked for
 directly. `SettingsStore`/`ThemeMode` in `:data`, `PowerViewTheme` plus a
 settings screen in `:ui`, and the shades app bar's two text buttons collapsed
 into a `More` overflow to make room for a third destination. The design
@@ -173,28 +194,24 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## Next step: steps 9 and 11, with step 5 still last
+## Next step: step 11, with step 5 still last
 
 **Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
-that when this session offered to start it. The previous version of this
-document recommended pulling it forward; that recommendation is withdrawn.
-What follows is kept because the decision it records is still open and will
-still be needed when step 5's turn comes.
+that when this session offered to start it. An earlier version of this
+document recommended pulling it forward; that recommendation is withdrawn, and
+the reasoning is kept below only because the decision it records is still open
+and will still be needed when step 5's turn comes.
 
-So the work in front of you is **step 9 (Glance widgets)** and then **step 11
-(Quick Settings tile and shortcuts)**. Both are stubbed with TODOs in
-`:widget` that spell out what they need to do, and both already have their
-`ActionRunner` → `CommandWorker` path built and green. Neither can be
-exercised until step 5 supplies a keystream, which is fine: every surface they
-drive already reports `NotAttempted.NoKeystream` honestly.
+So the work in front of you is **step 11: the Quick Settings tile and
+shortcuts**. `QuickSettingsTile.kt` is still a placeholder object, and most of
+what it needs now exists: `CommandDispatch.enqueue` is the one call that turns
+a tap into work, and the widget already drives it. The open design question is
+where the tile's *designated* action comes from — it has only one button, and
+nothing yet records which action it runs.
 
-Two things to know before starting step 9. `:widget` has neither the Compose
-compiler plugin nor `buildFeatures { compose = true }`, and Glance composables
-need both. And expedited `WorkManager` work below API 31 requires
-`getForegroundInfo()`, i.e. a foreground service plus the two
-`FOREGROUND_SERVICE*` permissions the manifest deliberately does not declare —
-with `minSdk = 26` that is a runtime `IllegalStateException` waiting on Android
-8-11, so either use ordinary one-shot work or declare the service properly.
+After that, step 6 (the guided derive-from-capture UI) is the last thing
+before step 5, and it is really part of keystream onboarding, so it may be
+worth taking together with it.
 
 ### The step 5 decision, when its turn comes
 
@@ -241,8 +258,17 @@ run:  ./gradlew --project-dir <harness> test
 
 Files that qualify today: all of `:protocol`, plus `Shade.kt`, `ShadeAction.kt`
 (strip `@Serializable` in the harness only), `ActionResult.kt`, `ThemeMode.kt`,
-and the `:ui` files `ShadeFormatting.kt`, `ActionDraft.kt` and
-`ThemeSelection.kt`. `BatteryLevel`/`batteryLevelOf`
+the `:ui` files `ShadeFormatting.kt`, `ActionDraft.kt` and `ThemeSelection.kt`,
+and `:widget`'s `WidgetPresentation.kt`.
+
+**The other half of verifying blind: read the API before calling it.** The
+Glance work was written against the AndroidX sources on GitHub
+(`raw.githubusercontent.com/androidx/androidx/androidx-main/glance/...`),
+which is reachable from here even though Google Maven is not. Checking a
+signature costs one fetch; guessing one costs a CI round trip, and guessing
+wrong about whether something is a member or a top-level extension is a
+coin flip either way — an unresolved import and a missing import are both
+hard errors. `BatteryLevel`/`batteryLevelOf`
 live inside `BatteryReader.kt`, which imports Android, so the harness needs a
 small verbatim copy of just those declarations.
 
@@ -254,7 +280,7 @@ inside the Compose files that use them.
 
 Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
 (`ActionResultTest`), 42 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
-`ThemeSelectionTest` 7).
+`ThemeSelectionTest` 7), 17 in `:widget` (`WidgetPresentationTest`).
 
 Also verifiable locally: workflow files with `actionlint`.
 

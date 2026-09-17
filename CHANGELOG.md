@@ -55,6 +55,51 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
+- **The home-screen widget (build order step 9).** One to six buttons per
+  widget, each running a saved `ShadeAction` through the same `ActionRunner`
+  funnel as the in-app controls. `ShadeActionWidget` + its receiver,
+  `WidgetConfigActivity` to choose which actions a given instance runs,
+  `WidgetStatus` to report results back, and `CommandDispatch` as the single
+  tap-to-work call the Quick Settings tile will also use.
+
+  A tap does no BLE work. Glance gives a callback a short window and a shade
+  exchange takes seconds, so the callback marks the button pending and
+  enqueues `CommandWorker`; the worker settles the button when it finishes.
+  Every terminal path in the worker reports, because a button stuck on
+  "Sending…" forever is worse than one that admits it failed.
+
+  **Not expedited work, despite the original TODO saying so.** Below API 31
+  WorkManager satisfies an expedited request by promoting the worker to a
+  foreground service, which needs `getForegroundInfo()` — whose default
+  implementation throws — plus two `FOREGROUND_SERVICE*` permissions and a
+  declared service. At `minSdk = 26` that is a crash on Android 8 through 11,
+  not a degraded experience.
+
+  State is per widget *instance*, not global: two widgets can point at the
+  same action, and one being mid-run is not a fact about the other's button.
+  Results, though, are written to every widget showing the action — a shade
+  moving is a fact about the action, not about which button was pressed.
+  Tap debounce has three layers, because a tap that queues a duplicate BLE
+  round trip costs battery on the shade: the composition drops the tap target
+  while a slot is pending, the callback re-reads the stored state behind it,
+  and `ExistingWorkPolicy.KEEP` on a per-action unique work name catches
+  whatever still gets through, including taps on a second widget.
+
+  A success clears the button back to idle rather than showing a tick. The
+  widget cannot verify that a shade moved — only that a frame was
+  acknowledged — and a confirmation mark would claim more than `ActionRunner`
+  knows. The in-app screens keep the nuance, including the load-bearing "may
+  or may not have moved"; a home-screen button just says "Failed — open the
+  app".
+
+  The widget follows the launcher's theme (dynamic colour on API 31+) rather
+  than the app's own setting. A widget sits on someone else's wallpaper, where
+  the black OLED scheme would be wrong as often as right.
+
+  `updatePeriodMillis` is 0. A widget waking on a timer would connect to
+  shades to learn that nothing had changed, spending the battery it exists to
+  report on; updates are pushed from the tap and from the worker.
+
 - **A theme picker, with an OLED black option.** Settings (app bar → More →
   Settings) offers Follow system / Light / Dark / Black (OLED), persisted in a
   new `SettingsStore`. The app previously used bare `MaterialTheme`, i.e.

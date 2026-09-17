@@ -1,0 +1,5 @@
+<resources>
+    <string name="widget_label">Shade action</string>
+    <string name="widget_description">Run a saved shade action from the home screen.</string>
+    <string name="widget_config_title">Choose actions</string>
+</resources>

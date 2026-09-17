@@ -37,9 +37,11 @@ colours yet.
 :ble        Android — scanning, GATT client, per-connection command serialization
 :data       Android — repository, persisted metadata + encrypted keystream storage, saved
             actions, and the single command-execution funnel (ActionRunner)
-:ui         Android/Compose — shade list UI (currently: the build-order-step-2 debug screen)
-:widget     Android — home-screen command surfaces: CommandWorker plus the Glance
-            widgets/tile/config activity, which are TODO stubs deferred per the build order
+:ui         Android/Compose — shade list, per-shade detail, actions list/editor,
+            settings (theme), and the build-order-step-2 debug screen as one route
+:widget     Android — home-screen command surfaces: the Glance widget, its
+            configuration activity and CommandWorker. The Quick Settings tile is
+            still a TODO stub (build order step 11)
 :app        Android application — manifest/permissions, MainActivity, DI wiring
 ```
 
@@ -57,9 +59,9 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 6. Keystream derivation-from-capture flow, tilt, secondary, sequence handling, command queue. (`KeystreamDeriver`, `CommandQueue` exist; the guided capture UI is TODO.)
 7. ✅ Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command`, plus the shade list, room grouping and the naming/detail screen.)
 8. ✅ `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Per-rail sliders on the shade detail screen call `ActionRunner` directly. Nothing can succeed until step 5 supplies a keystream — the controls say so rather than failing opaquely.)
-9. Glance widgets: 1×1, then the grid, then the config activity, with pending/failed states. (Stubbed with TODOs in `:widget` — deferred because this container has no Android SDK to compile/verify Glance code against.)
+9. ✅ Glance widgets: 1×1 and the grid, with a configuration activity and pending/failed states. (`ShadeActionWidget` + `ShadeActionWidgetReceiver`, `WidgetConfigActivity`, `WidgetStatus`, `CommandDispatch`. State is per widget *instance*, so two widgets pointing at the same action do not share a spinner. Not expedited work — see `CommandDispatch` for why that would crash below API 31.)
 10. ✅ Battery sweep worker and low-battery notifications. (`BatterySweepWorker`, weekly, skips mains-powered shades; `BatteryNotifier` posts one summary notification at or below `LOW_BATTERY_PERCENT`.)
-11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`.)
+11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`. `CommandDispatch` is the call it needs; the widget already uses it.)
 12. Optional: Home Assistant bridge via a Python port of `:protocol` + `bleak` + an ESPHome BLE proxy.
 
 ## Verifying `:protocol`
