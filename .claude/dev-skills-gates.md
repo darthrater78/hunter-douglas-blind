@@ -1,17 +1,19 @@
 # Dev Skills gate state
 Track: work commits (no version bump, no artifact publish, no release)
 Version: n/a — still pre-release, nothing tagged
-Updated: 2026-09-17 (end of session 3)
+Updated: 2026-09-17 (session 4)
 
 🔢 VERSION    ➖ N/A on a work commit — no version bump, nothing tagged or published
-🔨 BUILD      ✅ green at branch head (CI; see notes — local build is structurally impossible)
-🔒 SECURITY   ✅ session-3 diffs scanned, 0 Critical / 0 High — see notes, including one honest gap
-📄 DOCS       ✅ CHANGELOG, docs/HANDOFF.md and this file rewritten for the dependency sweep
+🔨 BUILD      ✅ green locally (CI's exact tasks, 141 tests) on the build server; CI green at the prior head
+🔒 SECURITY   ✅ session-4 diff is build config and docs, 0 Critical / 0 High; Dependabot alerts now on
+📄 DOCS       ✅ CHANGELOG, README, docs/HANDOFF.md and this file updated for session 4
 📦 RELEASE    ⬜ nothing open; the Dependabot queue is cleared (6 merged, 1 closed)
 🚀 SHIP       ⬜ nothing tagged or released
 
-Environment: remote container (git executed by Claude after approval; tag
-pushes and ref deletions always presented to the user)
+Environment: session 4 ran on the user's build server (Android SDK, Google Maven
+reachable); sessions 1–3 ran in a remote container that had neither. Git is
+executed by Claude after approval; tag pushes and ref deletions are always
+presented to the user.
 Repo: https://github.com/darthrater78/hunter-douglas-blind
 Branch: claude/load-dev-skills-d0bioe — **this is the repository's default
 branch.** There is no `main` or `master` and no tags at all.
@@ -32,6 +34,14 @@ exemption. If a real release is ever cut, creating a real `main` is the tidier
 fix.
 
 ## Build gate notes
+**Session 4 built locally for the first time.** On the build server,
+`./gradlew :protocol:test assembleDebug test assembleRelease` (exactly CI's
+tasks) passes: 141 test cases, 0 failed, and R8 plus `lintVitalRelease` on the
+release build. It passed before the session's changes and again after the
+built-in Kotlin migration. Full `./gradlew lint` fails (2 errors, starting with
+`MissingPermission` at `ShadeScanner.kt:96`) and did before the change too.
+CI does not run it.
+
 **Green at the branch head**, including `assembleRelease` with R8, where
 `lintVitalRelease` runs.
 
@@ -43,15 +53,17 @@ forward rather than reverted or worked around:
   Fixed by the documented opt-out (`android.builtInKotlin=false`,
   `android.newDsl=false`) rather than by the migration, because built-in Kotlin
   compiles with AGP's bundled Kotlin and that has to agree with the Compose
-  compiler plugin pinned at 2.4.20 — unknowable here. **The migration is owed
-  and AGP 10.0 removes the opt-out.**
+  compiler plugin pinned at 2.4.20, which was unknowable there. **Session 4 took
+  the migration:** the root `kotlin.jvm apply false` puts KGP 2.4.20 on the
+  build classpath (AGP 9.4.0 alone would bring 2.2.10), `buildEnvironment`
+  confirms it, and both flags are deleted.
 - **A concurrency-group fix that did not work.** Widening `pull_request` to
   `['**']` made it overlap `push`, and `head_ref || ref` does not collapse the
   pair (`<branch>` vs `refs/heads/<branch>`). PRs #1 and #6 each built twice
   before it was caught. It is `head_ref || ref_name` now.
 
-**The local build gate is structurally impossible here and CI is the only
-compiler.** The network policy denies `dl.google.com`, and `maven.google.com`
+**In the sandboxed container** (sessions 1–3), the local build gate was
+structurally impossible and CI was the only compiler. The network policy denies `dl.google.com`, and `maven.google.com`
 redirects there, so no AGP or AndroidX artifact resolves. Verify with
 `curl -sS "$HTTPS_PROXY/__agentproxy/status"`.
 
@@ -97,8 +109,14 @@ Specifically reviewed:
   `release.yml`, which does handle signing secrets, triggers on tags only and
   was not touched. No escalation.
 
-**The honest gap, and it is bigger than the container: nothing is watching
-this repository for CVEs at all.**
+**Update, session 4: Dependabot alerts and security updates are now enabled**
+by the owner. `GET .../dependabot/alerts` returns `[]` (no open alerts) instead
+of 403. Session 4 also re-resolved every action pin against upstream tags and
+checked `gradle-wrapper.jar` against Gradle's published SHA-256 for 9.7.1; all
+match. The session-3 text below is kept as the record of why it mattered.
+
+**The honest gap as of session 3, and it was bigger than the container: nothing
+was watching this repository for CVEs at all.**
 
 Two separate limits, and the second is the one that matters:
 
@@ -159,12 +177,11 @@ with import-a-known-key the standing recommendation) is in `docs/HANDOFF.md`.
 Three follow-ups the dependency sweep left behind. None blocks step 5, and none
 is something CI can answer:
 
-1. **Enable Dependabot alerts** (Settings → Code security). This is the most
-   valuable of the three and takes a minute — right now nothing watches this
-   project for CVEs. It is a repository setting, so it needs the owner. See the
-   security notes above.
-2. **The built-in Kotlin migration**, before AGP 10.0 removes the opt-out. The
-   steps are recorded in `gradle.properties` beside the flags; the open
-   question is whether the Compose plugin pin must move with AGP's bundled
-   Kotlin.
+1. ~~**Enable Dependabot alerts**~~ Done by the owner before session 4.
+2. ~~**The built-in Kotlin migration**~~ Done in session 4, built locally.
 3. **Look at the app under the Black (OLED) theme** after the Compose BOM jump.
+4. **Five AndroidX lines are behind** with no Dependabot PR for them
+   (activity-compose, lifecycle, datastore, work, glance). See "Currency" in
+   `docs/HANDOFF.md`. Build locally before pushing.
+5. **Full `./gradlew lint` fails** on `MissingPermission` in `:ble`. Fix it
+   before enabling the commented-out lint step in `ci.yml`.

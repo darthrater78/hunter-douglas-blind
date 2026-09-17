@@ -83,32 +83,37 @@ this isn't just "compiles" — it's checked against real sniffed traffic.
 `CapabilitiesTest`, `CommandFrameBuilderTest`, `FrameCipherTest`,
 `KeystreamDeriverTest`).
 
-The rest of the modules need an Android SDK to build (none is installed in
-the container that wrote this scaffold — `:protocol` was verified standalone
-instead). CI (`.github/workflows/ci.yml`) builds the whole project on a
-GitHub-hosted runner, which has the SDK preinstalled.
+The rest of the modules need an Android SDK. The container that wrote this
+scaffold had none, so `:protocol` was verified standalone there; any machine
+with the SDK and a `local.properties` pointing at it (`sdk.dir=...`, ignored by
+git) builds the whole project with the same tasks CI runs:
 
-## Versions that need confirming before the first full build
+```
+./gradlew :protocol:test assembleDebug test assembleRelease
+```
 
-`gradle/libs.versions.toml` marks each dependency `VERIFIED` (looked up
-against Maven Central) or `UNVERIFIED`. AGP and every AndroidX line are
-`UNVERIFIED` because the container that scaffolded this project could not reach
-`dl.google.com`/`maven.google.com`, the only place that metadata is published.
+CI (`.github/workflows/ci.yml`) runs exactly those on a GitHub-hosted runner.
+The full `./gradlew lint` is not among them and currently fails on
+`MissingPermission` in `:ble`; `assembleRelease` runs `lintVitalRelease`, which
+passes.
 
-**That marker now means less than it used to.** CI has built the whole project
-green with these versions, so they demonstrably exist and work together. What
-remains unknown is whether they are *current*. Check
-[the AGP release notes](https://developer.android.com/build/releases/gradle-plugin)
-and [AndroidX release notes](https://developer.android.com/jetpack/androidx/versions),
-then drop the markers. `agp` and `compileSdk`/`targetSdk` deserve the most
-attention — targetSdk 35 may already be at or below the Play Store's floor.
-Dependabot is configured and can finally open PRs for these, now that CI runs.
+## Dependency currency
+
+`gradle/libs.versions.toml` marks each AndroidX and AGP line `current` or
+`BEHIND` (naming the newer stable release), as checked against Google Maven on
+2026-09-17. Those lines used to say `UNVERIFIED`, because the container that
+scaffolded this project could not reach Google Maven at all.
+
+Five were behind on that date without Dependabot having offered them, so an
+empty Dependabot queue is not proof of currency. `targetSdk` 35 is deliberately
+left below `compileSdk` 37 and may be at or below the Play Store's floor; that
+is a release decision, not a dependency bump.
 
 `androidx.security:security-crypto` (used by `KeystreamStore`, the encrypted
-keystream storage) has historically only shipped pre-1.0 / alpha releases
-upstream — confirm its current status before shipping; if it's still alpha,
-that's worth a deliberate call given what it's protecting (see
-`docs/PROTOCOL.md` §4 on what a keystream lets you do).
+keystream storage) is on the stable 1.1.0. Its APIs are now deprecated
+upstream, so whether `EncryptedSharedPreferences` is the right home for the
+keystream is still a call to make before shipping (see `docs/PROTOCOL.md` §4 on
+what a keystream lets you do).
 
 ## Known protocol unknowns
 

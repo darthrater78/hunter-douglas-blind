@@ -11,11 +11,13 @@ updates:
           - "*"
 
   # Gradle — covers build.gradle.kts / settings.gradle.kts / gradle/libs.versions.toml
-  # across every module. Several versions in libs.versions.toml are marked
-  # UNVERIFIED (see that file's header) because Google's Maven repo was
-  # unreachable from the container that scaffolded this project — Dependabot
-  # running in CI, with normal network access, is what actually keeps these
-  # current going forward.
+  # across every module. This is version updates only. Advisory-driven security
+  # updates are not configured here: they come from the repository's Dependabot
+  # alerts and security updates settings, both enabled as of 2026-09-17.
+  #
+  # An empty queue is not proof of currency. On 2026-09-17, with nothing open,
+  # five AndroidX lines were still behind their latest stable release; see the
+  # BEHIND markers in libs.versions.toml.
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:

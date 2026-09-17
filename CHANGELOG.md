@@ -4,6 +4,40 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Built locally, on built-in Kotlin, with Dependabot alerts on
+
+The first local build of the whole project, on a machine with an Android SDK
+and Google Maven reachable. That answered three things the dependency sweep
+below had to leave open, and corrected one it got wrong.
+
+- **Built-in Kotlin is adopted; the AGP 9 opt-out is gone.** The open question
+  was whether AGP's bundled Kotlin would disagree with the Compose compiler
+  plugin at 2.4.20. It does bundle an older one (AGP 9.4.0's POM depends on
+  Kotlin 2.2.10), but the root build file's `kotlin.jvm ... apply false` puts
+  kotlin-gradle-plugin 2.4.20 on the build classpath, and `buildEnvironment`
+  confirms 2.4.20 is what resolves. `org.jetbrains.kotlin.android` is removed
+  from the five Android modules, the root build file and the catalog, and
+  `android.builtInKotlin=false` / `android.newDsl=false` are deleted from
+  `gradle.properties`. The two deprecation warnings they printed on every build
+  are gone. `:protocol:test assembleDebug test assembleRelease` (CI's tasks)
+  passes, with all 141 tests green. That root `kotlin.jvm` line is now
+  load-bearing for every module, and the build file says why.
+- **Dependabot alerts and security updates are enabled.** `GET
+  /dependabot/alerts` returns `[]` rather than the 403 recorded below: the
+  advisory watch exists now, and it reports no open alerts.
+- **Not everything is current, contrary to the sweep's conclusion.** Checked
+  against Google Maven directly, five AndroidX lines are behind their latest
+  stable release with no Dependabot PR offering them: activity-compose
+  1.9.3 → 1.13.0, lifecycle 2.8.7 → 2.11.0, datastore 1.1.1 → 1.2.1, work
+  2.10.0 → 2.11.2, glance 1.1.1 → 1.2.0. The catalog's `UNVERIFIED` markers are
+  replaced with `current` or `BEHIND`, as checked on 2026-09-17. Those five are
+  not bumped here; that is its own change with its own build.
+- **Found, not fixed:** the full `./gradlew lint` fails on `MissingPermission`
+  in `:ble`'s `ShadeScanner`, and did before this change. CI has never run that
+  task (it is commented out in `ci.yml`); `lintVitalRelease` passes.
+- `SKILLS-RECOMMENDATION.md`, a scratch file of findings for another
+  repository, is deleted as its own commit message said it would be.
+
 ### Build and dependencies
 
 The seven Dependabot PRs that had been sitting against the default branch were
@@ -61,16 +95,17 @@ they had been queued in turned out to be wrong, for a reason worth recording.
 
 **None of this fixed a known vulnerability, and it could not have.** All seven
 PRs were scheduled *version updates*; Dependabot's advisory-driven *security
-updates* are a separate feature and **alerts are disabled on this repository**
-(`GET /dependabot/alerts` → `403 "Dependabot alerts are disabled"`). No CVE or
+updates* are a separate feature and **alerts were disabled on this repository**
+at the time (`GET /dependabot/alerts` → `403 "Dependabot alerts are disabled"`;
+since enabled, see above). No CVE or
 GHSA identifier appears in any of the seven. The `security-crypto` move off a
 pre-release is supply chain maturity, not a patch. Being current lowers future
 exposure without measuring present exposure — the dependency status is
-*unknown*, not *clean*. Enabling Dependabot alerts is a repository setting and
-the single highest-value follow-up here.
+*unknown*, not *clean*. Enabling Dependabot alerts was a repository setting and
+the single highest-value follow-up here; it has since been done.
 
 Also owed, and neither is something CI can answer: the built-in Kotlin
-migration before AGP 10, and a **visual check of the Compose BOM jump** — two
+migration before AGP 10 (since done, see above), and a **visual check of the Compose BOM jump** — two
 years of Material 3 moved at once, and the OLED theme leans on the
 `surfaceContainer` roles and `surfaceTint`. Green means it compiles, not that
 it still looks right.

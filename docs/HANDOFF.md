@@ -1,6 +1,7 @@
 # Handoff
 
-Written 2026-09-17, rewritten the same day at the end of a third session.
+Written 2026-09-17, rewritten the same day at the end of a third session, and
+updated by a fourth that built the project locally for the first time.
 Branch `claude/load-dev-skills-d0bioe` — which is this repository's **default
 branch**, not a feature branch; there is no `main` or `master` and no tags at
 all — green in CI, with no release tagged. **The Dependabot queue is cleared:**
@@ -33,10 +34,17 @@ onboarding anyway. The UI is built to say so
 out loud rather than failing opaquely — see "The no-keystream state" below.
 
 **One thing is waiting: step 5.** The Dependabot queue that used to sit in
-front of it is done. Two follow-ups it left behind are real but neither blocks
-step 5, and both are things CI cannot answer — the built-in Kotlin migration
-before AGP 10, and a visual check of the Compose BOM jump against the OLED
-theme. Both are described under "The dependency sweep".
+front of it is done, and the fourth session closed two of its follow-ups: the
+built-in Kotlin migration is taken, and Dependabot alerts are on. Still open,
+none blocking step 5: a visual check of the Compose BOM jump against the OLED
+theme, five AndroidX lines that are behind (see "Currency" below), and a full
+`lint` that has never passed. All are under "The dependency sweep".
+
+**The project now builds locally.** The fourth session ran on a server with an
+Android SDK and ordinary network access, where
+`./gradlew :protocol:test assembleDebug test assembleRelease` passes. That makes
+a lot of "Verifying work without an Android SDK" below a fallback for the
+sandboxed container rather than the only option.
 
 Build order progress (numbering follows the README):
 
@@ -293,52 +301,61 @@ because the plan was wrong in three places and only building them showed it.
 
 Worth being blunt about, because "cleared the Dependabot queue" reads like
 security work and this was not that. **No known vulnerability was fixed,
-because none was ever reported.** GitHub has two separate Dependabot features
-and this repository has only one of them switched on:
+because none was ever reported.** GitHub has two separate Dependabot features,
+and during the sweep this repository had only one of them switched on:
 
-- **Version updates** — driven by `.github/dependabot.yml`, scheduled weekly.
-  On. All seven PRs were these.
-- **Security updates / alerts** — driven by the GitHub Advisory Database,
-  raised only when a dependency matches a published advisory. **Off.** The API
-  says so outright:
+- **Version updates**: driven by `.github/dependabot.yml`, scheduled weekly.
+  All seven PRs were these.
+- **Security updates / alerts**: driven by the GitHub Advisory Database,
+  raised only when a dependency matches a published advisory. **Off at the
+  time** (`GET .../dependabot/alerts` → `403 "Dependabot alerts are disabled for
+  this repository."`).
 
-```
-GET /repos/darthrater78/hunter-douglas-blind/dependabot/alerts
-403  "Dependabot alerts are disabled for this repository."
-```
-
-No CVE or GHSA identifier appears anywhere in the seven PR bodies; the only
-occurrence of the word "vulnerabilities" is inside a boilerplate badge URL. So
-by construction the sweep could not have fixed one.
+**Both are on now** (checked in the fourth session): alerts return `[]` instead
+of 403, and `security_and_analysis.dependabot_security_updates` is `enabled`.
+So something is watching for CVEs, and it currently reports none open. That is
+GitHub's advisory match against the dependency graph, not a lockfile audit. A
+one-off `osv-scanner` run is now possible from the build server and would be
+the stronger check before a release.
 
 Two claims that are easy to conflate, and should not be:
 
 - `androidx.security:security-crypto` alpha06 → stable 1.1.0 is a **supply
-  chain maturity** improvement — a pre-release library guarding the app's only
-  credential — **not** a patch for a known exploit. The package having
-  "security" in its name makes the stronger reading tempting.
+  chain maturity** improvement (a pre-release library guarding the app's only
+  credential), **not** a patch for a known exploit. The package having
+  "security" in its name makes the stronger reading tempting. Its APIs are
+  also now deprecated upstream (the local build warns on every use in
+  `KeystreamStore`).
 - The gate file's "0 Critical / 0 High" is a review of the **diff**, which is
   what dev-skills means by that gate. It is **not** a CVE scan of the
-  dependency tree, and no such scan has ever run here — Gradle cannot resolve
-  the Android tree with `dl.google.com` blocked.
+  dependency tree.
 
-What the sweep genuinely bought is **currency**, which lowers future exposure
-without measuring present exposure. The honest status of this project's
-dependencies is *unknown*, not *clean*.
+The security-shaped work that *was* done in the third session was defensive
+rather than remedial: both action SHAs resolved against their upstream tags,
+the `setup-gradle` pin caught claiming v4.4.4 while pointing at v4.4.3, and the
+widened trigger confirmed to be `pull_request` rather than
+`pull_request_target` (read-only token, no secrets, so a fork PR cannot reach
+anything). The fourth session re-resolved every pin and checked the wrapper
+jar's SHA-256 against Gradle's published checksum for 9.7.1; all match.
 
-**The fix is a repository setting, and only the owner can flip it:** Settings →
-Code security → enable **Dependabot alerts** and **Dependabot security
-updates**. Until that is on, nothing is watching this project for CVEs at all,
-and dev-skills §4.1 expects exactly that watch. A one-off `osv-scanner` run
-from a machine that can reach Google Maven would give a present-tense answer
-for the tree as it stands.
+### Currency: an empty queue did not mean current
 
-The security-shaped work that *was* done this session was defensive rather than
-remedial: both action SHAs resolved against their upstream tags, the
-`setup-gradle` pin caught claiming v4.4.4 while pointing at v4.4.3, and the
-widened trigger confirmed to be `pull_request` rather than `pull_request_target`
-(read-only token, no secrets, so a fork PR cannot reach anything). Useful, and
-none of it a vulnerability fix.
+The third session concluded everything was current once the queue was empty.
+Checked against Google Maven directly in the fourth, five AndroidX lines were
+behind with no Dependabot PR offering them:
+
+| Catalog key | Pinned | Latest stable (2026-09-17) |
+|---|---|---|
+| `activity-compose` | 1.9.3 | 1.13.0 |
+| `lifecycle` | 2.8.7 | 2.11.0 |
+| `datastore` | 1.1.1 | 1.2.1 |
+| `work` | 2.10.0 | 2.11.2 |
+| `glance` | 1.1.1 | 1.2.0 |
+
+Why Dependabot skipped them is not established. The catalog now marks every
+AndroidX/AGP line `current` or `BEHIND` instead of `UNVERIFIED`. Bumping these
+is a separate change; glance and work are the ones most worth building and
+looking at, because the widgets and the command funnel sit on them.
 
 ### The three things the plan got wrong
 
@@ -377,24 +394,28 @@ two-major migration landing at once. That claim was inherited rather than
 measured — the same failure mode this project has already recorded twice
 against the openHAB binding.
 
-### AGP 9 landed with built-in Kotlin switched off
+### AGP 9, and built-in Kotlin (opted out, then migrated)
 
-AGP 9.0 enables built-in Kotlin by default, which turns applying
-`org.jetbrains.kotlin.android` into a hard error rather than a redundancy. Five
-modules apply it, plus the root build file, so the documented migration is
-genuinely small — delete six lines and the catalog entry.
+AGP 9.0 enables built-in Kotlin by default, which makes applying
+`org.jetbrains.kotlin.android` a hard error (CI run #38). The third session
+opted out with `android.builtInKotlin=false` / `android.newDsl=false`, because
+built-in Kotlin compiles with the Kotlin that AGP resolves, that has to agree
+with the Compose compiler plugin at the catalog's `kotlin = 2.4.20`, and the
+container could not see which version that would be.
 
-It was **not** taken, and the reason matters. Built-in Kotlin compiles with the
-Kotlin that AGP bundles, and that has to agree with the Compose compiler plugin
-pinned at the catalog's `kotlin = 2.4.20`. Which Kotlin AGP 9.4.0 bundles
-cannot be established from this container at all, so taking it would have been
-a guess costing a CI round trip on the default branch. `android.builtInKotlin=false`
-and `android.newDsl=false` keep the pairing that already builds green.
+**The fourth session answered that and took the migration.** AGP 9.4.0's POM
+depends on Kotlin 2.2.10, but the root build file's
+`alias(libs.plugins.kotlin.jvm) apply false` puts kotlin-gradle-plugin 2.4.20 on
+the shared build classpath, and `./gradlew :ui:buildEnvironment` shows 2.4.20 is
+what resolves. So `kotlin-android` is gone from the five Android modules, the
+root build file and the catalog, and both flags are gone from
+`gradle.properties`. Nothing blocks AGP 10 on this front any more.
 
-**This is owed, with a hard deadline: AGP 10.0 removes the opt-out.** The steps
-are recorded in `gradle.properties` beside the flags, and the one open question
-is whether the Compose plugin pin must move with AGP's bundled Kotlin. Guide:
-https://developer.android.com/build/migrate-to-built-in-kotlin
+**That root `kotlin.jvm` line is now load-bearing for every module, not just
+`:protocol`.** Removing it was tried: the build does not configure at all
+("plugin is already on the classpath with an unknown version"). When bumping
+`kotlin`, the Compose plugin moves with it through the same catalog entry,
+which is the pairing that has to hold.
 
 ### compileSdk 37, targetSdk still 35
 
@@ -498,6 +519,13 @@ percent — not a full open. It is the first time this code can move a physical
 object, and the frame layout is the least-verified thing in the project.
 
 ## Verifying work without an Android SDK
+
+**If you are on the build server, skip most of this section.** It has an
+Android SDK at `~/Android/Sdk` and reaches Google Maven, so run CI's tasks
+directly (`local.properties` with `sdk.dir=...` is ignored by git). What
+follows applies to the sandboxed Claude Code container, where none of that is
+true. The cross-module `internal` blind spot below does not exist on a real
+build, which compiles each module separately.
 
 **The Android modules cannot be built in the Claude Code container.** No Android
 SDK, and the network policy blocks `dl.google.com` / `maven.google.com`, so AGP
@@ -603,6 +631,10 @@ the method count, and it cannot be checked from the container because
 Both numbers are right about different things; this table counts methods,
 which is the one you can verify here with `grep -c '@Test'`.
 
+A full local run (fourth session) executes **141** test cases, 0 failed or
+skipped: the 121 methods above, with `:protocol`'s two parameterised tests
+expanding its 20 methods to 40 cases.
+
 Of those, 62 run in the off-device harness (everything in `:ui` and
 `:widget` that has no Android imports, plus the `:data` pure files).
 
@@ -616,7 +648,15 @@ Also verifiable locally: workflow files with `actionlint`.
 
 **Green on the branch head**, including `assembleRelease` with R8, which is
 where `lintVitalRelease` runs. Every commit on this branch has been seen by a
-compiler.
+compiler. The fourth session's built-in Kotlin migration was built locally
+with CI's exact tasks before being pushed.
+
+**The full `./gradlew lint` fails, and always has.** CI does not run it (it is
+commented out in `ci.yml`), so nothing noticed: 2 errors and 1 warning,
+starting with `MissingPermission` at `ShadeScanner.kt:96`
+(`scanner.stopScan(callback)`). The fourth session confirmed it fails
+identically before its own changes. Worth fixing before turning that CI step
+on.
 
 The third session's runs went #33–#37 ✅ (the Dependabot merges, most of them
 cancelled by the next merge landing — see below), **#38 ❌ AGP 9**, #39 ✅ the
@@ -654,15 +694,12 @@ These were identified in the audit and cannot be completed from the sandbox:
 
 - **Gradle dependency locking and `gradle/verification-metadata.xml`.** Both are
   generated from a successful dependency resolution, which needs Google Maven.
-  Worth doing from a normal dev machine — it is the only way to get a lockfile
-  to audit against.
-- **Currency of the pinned versions — answered.** The whole Dependabot queue
-  is merged, so AGP, the Gradle wrapper, the AndroidX entries and the action
-  pins are current as of 2026-09-17. `UNVERIFIED` markers were deleted as each
-  bump landed. What the marker never meant is still worth keeping in mind: it
-  said "known to work, not known to be current", and a green build says
-  nothing about currency either. Dependabot is the thing that keeps answering
-  this between security gates — leave it pointed here.
+  No longer blocked: the build server can resolve the tree. Not yet done.
+- **Currency of the pinned versions: mostly answered, and not by the queue.**
+  The Dependabot queue being empty was read as "everything is current", and it
+  was not. See "Currency" above: five AndroidX lines are behind. AGP, the
+  wrapper, the action pins and the rest of the catalog are current as of
+  2026-09-17, checked against Google Maven rather than inferred.
 - **`androidx.security:security-crypto` is on the stable `1.1.0`** as of PR #5.
   That closes the alpha concern, which was pressing because step 5 is about to
   put a real keystream behind it. It does **not** settle the larger question:

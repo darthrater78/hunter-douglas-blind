@@ -1,19 +1,18 @@
 # Dependency version catalog.
 #
-# VERIFIED = looked up against Maven Central. UNVERIFIED = could not be checked
-# when written, because the scaffolding container's network policy blocked
-# dl.google.com / maven.google.com, the only place AndroidX and AGP metadata is
-# published.
+# Every AndroidX and AGP line below was checked against Google Maven on
+# 2026-09-17, from a machine that can reach it (the container that scaffolded
+# this project could not, which is why these used to be marked UNVERIFIED), and
+# the whole project builds locally on them. "current" means latest stable as of
+# that date; "BEHIND" names the newer stable release that exists.
 #
-# UNVERIFIED no longer means "might not work": CI has built the whole project
-# green on these versions. It means "not known to be current". Confirm against
-# https://developer.android.com/build/releases/gradle-plugin and
-# https://developer.android.com/jetpack/androidx/versions, then delete the
-# markers. agp and compileSdk/targetSdk are the ones most likely to be stale.
+# Five lines are BEHIND and Dependabot had not offered any of them, so "no open
+# Dependabot PR" is not evidence of currency here. Bumping them is a separate
+# change with its own build.
 
 [versions]
 # Build tooling
-agp = "9.4.0" # Dependabot-reported current (PR #4); needs Gradle >= 9.6.0, wrapper is 9.7.1
+agp = "9.4.0" # current; needs Gradle >= 9.6.0, wrapper is 9.7.1
 kotlin = "2.4.20" # VERIFIED — Maven Central, org.jetbrains.kotlin:kotlin-gradle-plugin
 compileSdk = "37" # Required by the AndroidX artifacts in PRs #1 and #6; AGP 9.4.0 supports it
 targetSdk = "35" # Deliberately NOT moved with compileSdk — targetSdk opts the app in to new
@@ -26,22 +25,22 @@ coroutines = "1.11.0" # VERIFIED — Maven Central, kotlinx-coroutines-android
 serialization-json = "1.11.0" # VERIFIED — Maven Central, kotlinx-serialization-json (latest stable, excludes 1.12.0-RC)
 
 # AndroidX
-core-ktx = "1.19.0" # UNVERIFIED
-appcompat = "1.8.0" # UNVERIFIED
-activity-compose = "1.9.3" # UNVERIFIED
-lifecycle = "2.8.7" # UNVERIFIED
-compose-bom = "2026.09.00" # UNVERIFIED
-datastore = "1.1.1" # UNVERIFIED
-work = "2.10.0" # UNVERIFIED
-glance = "1.1.1" # UNVERIFIED
-security-crypto = "1.1.0" # VERIFIED — CI green on the stable release (PR #5); was 1.1.0-alpha06
-navigation-compose = "2.10.1" # UNVERIFIED — referenced by no module, so no build has ever resolved it
+core-ktx = "1.19.0" # current
+appcompat = "1.8.0" # current
+activity-compose = "1.9.3" # BEHIND — 1.13.0
+lifecycle = "2.8.7" # BEHIND — 2.11.0
+compose-bom = "2026.09.00" # current
+datastore = "1.1.1" # BEHIND — 1.2.1
+work = "2.10.0" # BEHIND — 2.11.2
+glance = "1.1.1" # BEHIND — 1.2.0
+security-crypto = "1.1.0" # current; was 1.1.0-alpha06 until PR #5
+navigation-compose = "2.10.1" # current — but referenced by no module, so no build has ever resolved it
 
 # Test
-junit5 = "6.1.3" # VERIFIED — CI green (PR #2); test-only, :protocol
-junit4 = "4.13.2" # UNVERIFIED
-androidx-test-ext = "1.3.0" # UNVERIFIED
-espresso = "3.7.0" # UNVERIFIED
+junit5 = "6.1.3" # test-only, :protocol
+junit4 = "4.13.2" # current (Maven Central)
+androidx-test-ext = "1.3.0" # current
+espresso = "3.7.0" # current
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -80,7 +79,6 @@ androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", vers
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
