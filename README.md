@@ -29,10 +29,11 @@ next.
 ```
 :protocol   pure Kotlin/JVM, zero Android deps — frame math, unit tested here and now
 :ble        Android — scanning, GATT client, per-connection command serialization
-:data       Android — repository, persisted metadata + encrypted keystream storage, saved actions
+:data       Android — repository, persisted metadata + encrypted keystream storage, saved
+            actions, and the single command-execution funnel (ActionRunner)
 :ui         Android/Compose — shade list UI (currently: the build-order-step-2 debug screen)
-:widget     Android — the single command-execution funnel (ActionRunner/CommandWorker);
-            Glance widgets/tile/config activity are TODO stubs, deferred per the build order
+:widget     Android — home-screen command surfaces: CommandWorker plus the Glance
+            widgets/tile/config activity, which are TODO stubs deferred per the build order
 :app        Android application — manifest/permissions, MainActivity, DI wiring
 ```
 

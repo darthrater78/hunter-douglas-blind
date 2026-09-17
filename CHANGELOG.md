@@ -5,6 +5,25 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Changed
+- **`ActionRunner` and `ActionResult` move from `:widget` to `:data`.** The
+  runner is a GATT-backed domain service over `:ble`, not a home-screen
+  surface — `BatteryReader` is the existing precedent for exactly that shape in
+  exactly that module. `:ui` and `:widget` are peers that both drive commands,
+  so neither should have to depend on the other to reach the funnel. `:widget`
+  keeps `CommandWorker` and the Glance surfaces.
+- **`ActionRunner` reports *why* a command failed.** It returned a bare
+  `Boolean` and told callers wanting detail to go and inspect
+  `ShadeStore`/`KeystreamStore` themselves. The new `CommandOutcome` separates
+  failures knowable without touching BLE (`NotAttempted`: no keystream, no
+  `homeId`, unknown shade, missing permission, Bluetooth off, malformed MAC)
+  from `TransportFailed`, which carries the stage it got to. That distinction
+  is about the physical world rather than about error handling: `NotAttempted`
+  means the shade certainly did not move, while a failed *write* may have
+  landed before the acknowledgement was lost. `ActionRunner.send` and
+  `checkReadiness` expose this to in-app UI; the widget and `CommandWorker`
+  paths still collapse to a single failure, which is all a home-screen icon can
+  say. This matters now because, with keystream onboarding deferred to last,
+  `NoKeystream` is the expected outcome of every command in the app.
 - **`0x2A19` is a percentage, not a coarse bucket.** `docs/PROTOCOL.md` claimed
   the battery characteristic returned 10/50/100 for low/medium/high, following
   the openHAB binding's behaviour. A real Duette TDBU returned 65. The
@@ -18,6 +37,9 @@ All notable changes to this project are documented here.
   than a speed.
 
 ### Added
+- `ActionResultTest` in `:data` — first unit tests outside `:protocol`, covering
+  the aggregation the UI branches on to tell "the whole action is blocked on
+  setup" apart from "some shades were unreachable".
 - First hardware-captured test vector: `3C F8 08 00 00 09 00 00 C0`, sniffed
   from a Duette TDBU, pinned in `AdvertisementParserTest`. Every other vector
   in the suite is synthetic — built by the test and read back — which proves
@@ -36,11 +58,12 @@ All notable changes to this project are documented here.
   serialization).
 - `:data`: `ShadeRepository` (merges live scan + persisted metadata),
   `ShadeStore` (plain metadata via DataStore), `KeystreamStore` (encrypted
-  keystream storage), `ActionStore` (saved `ShadeAction`s).
-- `:widget`: `ActionRunner` (the single command-execution funnel) and
-  `CommandWorker` (`WorkManager` integration). Glance widget UI, the widget
-  config activity, and the Quick Settings tile are stubbed with TODOs —
-  deferred pending an Android SDK to build/verify them against.
+  keystream storage), `ActionStore` (saved `ShadeAction`s), `ActionRunner`
+  (the single command-execution funnel).
+- `:widget`: `CommandWorker` (`WorkManager` integration). Glance widget UI, the
+  widget config activity, and the Quick Settings tile are stubbed with TODOs —
+  deferred pending an Android SDK to build/verify them against. (`ActionRunner`
+  started here and has since moved to `:data` — see Changed.)
 - `:ui`: `DebugScanScreen` — the build-order-step-2 raw scan debug view.
 - `:app`: manifest with BLE/foreground-service/notification permissions,
   `MainActivity`, `PowerViewApplication` (manual DI wiring + `WorkManager`

@@ -3,12 +3,12 @@ package com.scrivtech.powerview.app
 import android.app.Application
 import androidx.work.Configuration
 import com.scrivtech.powerview.ble.ShadeScanner
+import com.scrivtech.powerview.data.ActionRunner
 import com.scrivtech.powerview.data.ActionStore
 import com.scrivtech.powerview.data.BatteryReader
 import com.scrivtech.powerview.data.KeystreamStore
 import com.scrivtech.powerview.data.ShadeRepository
 import com.scrivtech.powerview.data.ShadeStore
-import com.scrivtech.powerview.widget.ActionRunner
 import com.scrivtech.powerview.widget.CommandWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
