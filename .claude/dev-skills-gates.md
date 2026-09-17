@@ -5,7 +5,7 @@ Updated: 2026-09-17 (session 4)
 
 🔢 VERSION    ➖ N/A on a work commit — no version bump, nothing tagged or published
 🔨 BUILD      ✅ green locally (CI's exact tasks incl. full lint, 141 tests) on the build server
-🔒 SECURITY   ✅ session-4 diffs reviewed, 0 Critical / 0 High; Dependabot alerts now on; see PR #9 caching note
+🔒 SECURITY   ✅ session-4 diffs reviewed, 0 Critical / 0 High; Dependabot alerts now on; setup-gradle v6.3.0 on the open-source cache
 📄 DOCS       ✅ CHANGELOG, README, docs/HANDOFF.md and this file updated for session 4
 📦 RELEASE    ⬜ nothing open; the Dependabot queue is cleared (6 merged, 1 closed)
 🚀 SHIP       ⬜ nothing tagged or released
@@ -189,8 +189,7 @@ is something CI can answer:
 3. **Look at the app under the Black (OLED) theme** after the Compose BOM jump.
 4. ~~**Five AndroidX lines are behind**~~ Bumped in session 4, built locally.
 5. ~~**Full `./gradlew lint` fails**~~ Fixed in session 4; CI now runs lint.
-6. **Merge PR #9** (setup-gradle v6.3.0; SHA verified, CI green), then set
-   `cache-provider: basic` on both setup-gradle steps unless the proprietary
-   enhanced cache is wanted. See "PR #9" in `docs/HANDOFF.md`.
+6. ~~**Merge PR #9**~~ Merged by the owner; both setup-gradle steps set
+   `cache-provider: basic` by the owner's choice.
 7. **Try scanning on an Android 8–11 device.** The permission fix is
    compiled and linted, not run.

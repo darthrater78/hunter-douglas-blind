@@ -39,8 +39,8 @@ built-in Kotlin migration is taken, Dependabot alerts are on, five AndroidX
 lines that were behind are bumped, and full `lint` passes and gates CI, which
 exposed and fixed a scanning bug on Android 8–11. Still open, none blocking
 step 5: a visual check of the Compose BOM jump against the OLED theme, a device
-check of the widgets on the newer Glance/WorkManager, and PR #9's caching
-choice. All are under "The dependency sweep".
+check of the widgets on the newer Glance/WorkManager, and a scan on an
+Android 8–11 device. All are under "The dependency sweep".
 
 **The project now builds locally.** The fourth session ran on a server with an
 Android SDK and ordinary network access, where
@@ -360,19 +360,20 @@ AndroidX/AGP line `current` instead of `UNVERIFIED`. Glance and WorkManager
 carry the widgets, the tile and the command funnel, so those are what to look
 at on a device.
 
-### PR #9: setup-gradle v6.3.0, and a caching choice
+### PR #9: setup-gradle v6.3.0, and the caching choice
 
 Dependabot offered `gradle/actions/setup-gradle` 4.4.3 → 6.3.0 after the
-fourth session's push. The SHA resolves to the upstream v6.3.0 tag and CI is
-green on it. Merging it was left to the owner.
+fourth session's push. The SHA resolves to the upstream v6.3.0 tag and CI was
+green on it. The owner squash-merged it (`af0c7a2`).
 
 It changes more than a version: from v5 the action defaults to
 `cache-provider: enhanced`, a **proprietary, closed-source** caching provider
 with its own terms of use (the CI log says so on every run, and points at
 `gradle/actions` `DISTRIBUTION.md`). v4 used the open-source cache. For a
-repository that resolves every action SHA by hand, the consistent choice is
-`cache-provider: basic` on both `setup-gradle` steps, in `ci.yml` and
-`release.yml`, as a follow-up commit after the merge.
+repository that resolves every action SHA by hand, the consistent choice was
+`cache-provider: basic`, and the owner chose it: both `setup-gradle` steps, in
+`ci.yml` and `release.yml`, now set it, with a comment. If a future bump
+leaves CI logging "Enhanced Caching", that setting has been lost.
 
 ### The three things the plan got wrong
 
@@ -720,8 +721,8 @@ These were identified in the audit and cannot be completed from the sandbox:
   The Dependabot queue being empty was read as "everything is current", and it
   was not. See "Currency" above: five AndroidX lines were behind and are now
   bumped. As of 2026-09-17 the whole catalog, AGP and the wrapper are current,
-  checked against Google Maven rather than inferred; setup-gradle waits on PR
-  #9.
+  checked against Google Maven rather than inferred, and setup-gradle is on
+  v6.3.0 (PR #9).
 - **`androidx.security:security-crypto` is on the stable `1.1.0`** as of PR #5.
   That closes the alpha concern, which was pressing because step 5 is about to
   put a real keystream behind it. It does **not** settle the larger question:

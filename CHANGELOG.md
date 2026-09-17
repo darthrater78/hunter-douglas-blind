@@ -45,10 +45,10 @@ below had to leave open, and corrected one it got wrong.
   error was `QuickSettingsTile` calling the deprecated
   `startActivityAndCollapse(Intent)`, already only below API 34; lint flags it
   regardless of the version branch, so it is suppressed with a comment.
-- **`gradle/actions/setup-gradle` v6.3.0 is offered (PR #9), and needs a
-  decision alongside it.** From v5 the action defaults to a proprietary,
-  closed-source caching provider ("Enhanced Caching") with its own terms of
-  use. `cache-provider: basic` keeps the open-source cache v4 used.
+- **`gradle/actions/setup-gradle` is on v6.3.0 (PR #9), with the open-source
+  cache.** From v5 the action defaults to a proprietary, closed-source caching
+  provider ("Enhanced Caching") with its own terms of use. Both workflows set
+  `cache-provider: basic`, which keeps the open-source cache v4 used.
 - `SKILLS-RECOMMENDATION.md`, a scratch file of findings for another
   repository, is deleted as its own commit message said it would be.
 

@@ -107,6 +107,11 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6.3.0
+        with:
+          # From v5 the default is 'enhanced', a proprietary closed-source
+          # caching service with its own terms of use. 'basic' is the
+          # open-source GitHub Actions cache v4 used. Chosen deliberately.
+          cache-provider: basic
 
       # Signing material arrives as secrets and is written to disk only for the
       # length of the build. app/build.gradle.kts picks the keystore up from
