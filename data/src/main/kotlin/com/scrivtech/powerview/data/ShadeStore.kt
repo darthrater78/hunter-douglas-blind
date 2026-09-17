@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -29,7 +30,14 @@ public data class ShadeMetadata(
     public val homeId: Int? = null,
     public val capabilityId: Int? = null,
     public val lastSeenAtEpochMillis: Long? = null,
-    public val batteryBucket: Int? = null,
+    /**
+     * Battery percentage, 0..100. `@SerialName` pins the old wire name: the
+     * field was named for a "coarse bucket" before real hardware showed it to be
+     * a percentage (docs/PROTOCOL.md §1), and renaming it on disk would make
+     * every already-stored reading decode as null.
+     */
+    @SerialName("batteryBucket")
+    public val batteryPercent: Int? = null,
     public val batteryReadAtEpochMillis: Long? = null,
     public val mainsPowered: Boolean = false,
 )

@@ -112,7 +112,7 @@ public class ShadeRepository(
                     room = meta.room,
                     homeId = meta.homeId ?: existing.homeId,
                     mainsPowered = meta.mainsPowered,
-                    batteryBucket = meta.batteryBucket ?: existing.batteryBucket,
+                    batteryPercent = meta.batteryPercent ?: existing.batteryPercent,
                     batteryReadAt = meta.batteryReadAtEpochMillis?.let(Instant::ofEpochMilli) ?: existing.batteryReadAt,
                 )
             }
@@ -128,7 +128,7 @@ public class ShadeRepository(
         state = null,
         capabilities = null,
         lastSeenAt = null,
-        batteryBucket = null,
+        batteryPercent = null,
         batteryReadAt = null,
         mainsPowered = false,
         lastRssi = null,

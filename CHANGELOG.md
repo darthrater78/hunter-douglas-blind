@@ -4,7 +4,27 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Changed
+- **`0x2A19` is a percentage, not a coarse bucket.** `docs/PROTOCOL.md` claimed
+  the battery characteristic returned 10/50/100 for low/medium/high, following
+  the openHAB binding's behaviour. A real Duette TDBU returned 65. The
+  Bluetooth SIG defines Battery Level as a uint8 percentage, and the evidence
+  is consistent with these shades honouring that, so the doc is corrected and
+  the reading is now shown as `65% (high)` rather than `medium (raw 65)`.
+  `ShadeMetadata.batteryBucket` is renamed to `batteryPercent` with
+  `@SerialName("batteryBucket")`, so readings already on disk still decode.
+- `docs/PROTOCOL.md` §8: the `velocity` byte is probably misnamed. A stationary
+  shade reported `0xC0` (`0b1100_0000`), which reads like a flags byte rather
+  than a speed.
+
 ### Added
+- First hardware-captured test vector: `3C F8 08 00 00 09 00 00 C0`, sniffed
+  from a Duette TDBU, pinned in `AdvertisementParserTest`. Every other vector
+  in the suite is synthetic — built by the test and read back — which proves
+  the parser is self-consistent but cannot prove the offsets match what a shade
+  actually broadcasts. Nine real bytes is exactly what the field table
+  consumes, so a layout shifted by one would not fit. The advertisement offsets
+  are now confirmed, not merely assumed.
 - Initial multi-module Gradle scaffold (`:protocol`, `:ble`, `:data`, `:ui`,
   `:widget`, `:app`).
 - `:protocol`: advertisement parsing, 13-byte command frame builder,

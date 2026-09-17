@@ -19,10 +19,12 @@ import java.time.Instant
  * unencrypted. It does need a connection, though, which is why it is not part
  * of the advertisement read path.
  *
- * The value is a coarse bucket, not a percentage — the shades report roughly
- * 10 / 50 / 100 for low / medium / high (see `docs/PROTOCOL.md` §1). Treat it
- * as three states; the exact number is not a charge percentage and should not
- * be rendered as one.
+ * The value is a percentage, 0..100, per the Bluetooth SIG's definition of
+ * `0x2A19`. `docs/PROTOCOL.md` §1 previously described it as a coarse
+ * 10/50/100 bucket, following the openHAB binding's behaviour; a real Duette
+ * TDBU returned 65, which is not one of those buckets, so that claim has been
+ * corrected. [batteryLevelOf] still reduces it to three states for display,
+ * but the underlying number is a real reading and is kept.
  *
  * Results are persisted to [ShadeStore] so a reading survives process death
  * and can be shown without reconnecting — shades are battery devices and
@@ -71,10 +73,10 @@ public class BatteryReader(
             // as "not supported" rather than as a failure.
             if (value == null || value.isEmpty()) return BatteryReadResult.NotSupported
 
-            val bucket = value[0].toInt() and 0xFF
+            val percent = value[0].toInt() and 0xFF
             val readAt = Instant.now()
-            persist(macAddress, bucket, readAt)
-            BatteryReadResult.Success(bucket, readAt)
+            persist(macAddress, percent, readAt)
+            BatteryReadResult.Success(percent, readAt)
         } catch (e: SecurityException) {
             BatteryReadResult.Failed("BLUETOOTH_CONNECT revoked mid-read")
         } finally {
@@ -84,17 +86,17 @@ public class BatteryReader(
         }
     }
 
-    private suspend fun persist(macAddress: String, bucket: Int, readAt: Instant) {
+    private suspend fun persist(macAddress: String, percent: Int, readAt: Instant) {
         val existing = shadeStore.shades.first()[macAddress]
         val metadata = existing?.copy(
-            batteryBucket = bucket,
+            batteryPercent = percent,
             batteryReadAtEpochMillis = readAt.toEpochMilli(),
         ) ?: ShadeMetadata(
             // Seen live but never labelled: fall back to the MAC, matching how
             // ShadeRepository names a shade it has no metadata for.
             macAddress = macAddress,
             label = macAddress,
-            batteryBucket = bucket,
+            batteryPercent = percent,
             batteryReadAtEpochMillis = readAt.toEpochMilli(),
         )
         shadeStore.upsert(metadata)
@@ -103,7 +105,7 @@ public class BatteryReader(
 
 /** Outcome of one [BatteryReader.read]. */
 public sealed interface BatteryReadResult {
-    public data class Success(val bucket: Int, val readAt: Instant) : BatteryReadResult
+    public data class Success(val percent: Int, val readAt: Instant) : BatteryReadResult
 
     /** The shade exposes no battery characteristic — expected for a mains-powered unit. */
     public data object NotSupported : BatteryReadResult
@@ -112,17 +114,25 @@ public sealed interface BatteryReadResult {
 }
 
 /**
- * The three states the coarse bucket actually encodes. Anything unrecognised
- * is reported as [UNKNOWN] rather than guessed at, so a firmware change that
- * starts reporting real percentages is visible instead of silently mislabelled.
+ * A coarse reading of the battery percentage, for surfaces that want a state
+ * rather than a number. A value outside 0..100 is [UNKNOWN] rather than
+ * clamped, so a firmware change that starts reporting something other than a
+ * percentage is visible instead of silently mislabelled.
  */
 public enum class BatteryLevel { LOW, MEDIUM, HIGH, UNKNOWN }
 
-/** Maps a raw bucket (see [BatteryReader]) to its [BatteryLevel]. */
-public fun batteryLevelOf(bucket: Int?): BatteryLevel = when (bucket) {
+/**
+ * Maps a battery percentage to its [BatteryLevel]. [LOW_BATTERY_PERCENT] is
+ * the threshold the step-10 sweep will alert on, so it is defined once here
+ * rather than being picked again in the notification code.
+ */
+public fun batteryLevelOf(percent: Int?): BatteryLevel = when (percent) {
     null -> BatteryLevel.UNKNOWN
-    in 0..25 -> BatteryLevel.LOW
-    in 26..75 -> BatteryLevel.MEDIUM
-    in 76..100 -> BatteryLevel.HIGH
+    in 0..LOW_BATTERY_PERCENT -> BatteryLevel.LOW
+    in (LOW_BATTERY_PERCENT + 1)..60 -> BatteryLevel.MEDIUM
+    in 61..100 -> BatteryLevel.HIGH
     else -> BatteryLevel.UNKNOWN
 }
+
+/** At or below this percentage a shade is considered low (spec §2.5). */
+public const val LOW_BATTERY_PERCENT: Int = 20

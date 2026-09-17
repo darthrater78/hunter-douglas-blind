@@ -184,21 +184,22 @@ private fun ShadeDebugRow(
 }
 
 /**
- * The bucket is not a charge percentage — the shades report roughly 10/50/100
- * for low/medium/high — so the level leads and the raw number follows in
- * brackets for anyone verifying against real hardware.
+ * `0x2A19` is a percentage (see `docs/PROTOCOL.md` §1 — this was previously
+ * documented as a coarse 10/50/100 bucket and corrected against real
+ * hardware), so the number leads and the coarse level follows it.
  */
 private fun batteryText(shade: Shade): String {
     if (shade.mainsPowered) return "mains-powered"
-    val bucket = shade.batteryBucket ?: return "not read yet"
-    val level = when (batteryLevelOf(bucket)) {
+    val percent = shade.batteryPercent ?: return "not read yet"
+    val level = when (batteryLevelOf(percent)) {
         BatteryLevel.LOW -> "low"
         BatteryLevel.MEDIUM -> "medium"
         BatteryLevel.HIGH -> "high"
-        BatteryLevel.UNKNOWN -> "unrecognised"
+        // Outside 0..100: not a percentage, so do not pretend to grade it.
+        BatteryLevel.UNKNOWN -> "unrecognised value"
     }
     val readAt = shade.batteryReadAt?.let { " at $it" } ?: ""
-    return "$level (raw $bucket)$readAt"
+    return "$percent% ($level)$readAt"
 }
 
 private fun percent(value: Double?): String =
