@@ -1,0 +1,22 @@
+<resources>
+    <!--
+      Night override of the window dressing only — the UI itself is styled by
+      PowerViewTheme in Compose, not from here.
+
+      The point is the frame between the window opening and Compose drawing
+      anything. AppCompat's night background is a mid grey, so on the OLED
+      theme every cold start flashes grey before turning black. Black here
+      removes that.
+
+      Two honest limitations. This applies to *both* dark themes, since a
+      resource qualifier can only see the system's night setting and not the
+      app's own ThemeMode — harmless, because the standard dark scheme's
+      surfaces are nearly this dark anyway. And someone running the OLED theme
+      with the system in light mode still gets a light first frame, for the
+      same reason. Fixing either properly means recreating the activity on a
+      theme change, which is a lot of machinery for one frame.
+    -->
+    <style name="Theme.PowerView" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

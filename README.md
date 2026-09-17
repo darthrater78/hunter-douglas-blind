@@ -13,6 +13,10 @@ understanding it.
 
 ## Status
 
+**See [`docs/HANDOFF.md`](docs/HANDOFF.md) first** — it records what is
+confirmed against real hardware versus merely assumed, which is the distinction
+that matters most in this project, plus the next step and its open decision.
+
 Starting framework. `:protocol` (advertisement parsing, command frame
 encoding, AES-CTR keystream handling, capability lookup) is fully
 implemented and unit-tested against real sniffed test vectors — see
@@ -20,15 +24,24 @@ implemented and unit-tested against real sniffed test vectors — see
 follows the build order below; see each module's TODOs for exactly what's
 next.
 
+Appearance is a setting rather than a build-order step: app bar → More →
+Settings offers Follow system / Light / Dark / **Black (OLED)**, the last of
+which uses true-black backgrounds so an OLED panel can switch those pixels
+off. Light and dark are Material 3's baseline palettes — the app has no brand
+colours yet.
+
 ## Module map
 
 ```
 :protocol   pure Kotlin/JVM, zero Android deps — frame math, unit tested here and now
 :ble        Android — scanning, GATT client, per-connection command serialization
-:data       Android — repository, persisted metadata + encrypted keystream storage, saved actions
-:ui         Android/Compose — shade list UI (currently: the build-order-step-2 debug screen)
-:widget     Android — the single command-execution funnel (ActionRunner/CommandWorker);
-            Glance widgets/tile/config activity are TODO stubs, deferred per the build order
+:data       Android — repository, persisted metadata + encrypted keystream storage, saved
+            actions, and the single command-execution funnel (ActionRunner)
+:ui         Android/Compose — shade list, per-shade detail, actions list/editor,
+            settings (theme), and the build-order-step-2 debug screen as one route
+:widget     Android — home-screen command surfaces: the Glance widget, its
+            configuration activity, the battery widget, the Quick Settings tile,
+            launcher shortcuts and CommandWorker
 :app        Android application — manifest/permissions, MainActivity, DI wiring
 ```
 
@@ -39,16 +52,16 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 ## Build order
 
 1. ✅ `:protocol` + unit tests against the sniffed test vectors. No hardware needed.
-2. Scanner + a raw debug screen listing MAC / RSSI / decoded state / hex payload — confirms offsets against real shades before any writes. (`ShadeScanner`, `DebugScanScreen` exist; RSSI/raw-hex surfacing in the screen is a small follow-up, noted in `DebugScanScreen.kt`.)
-3. Capability mapping and per-shade UI model. (`Capabilities`, `Shade` exist.)
-4. GATT connect + battery/device-info reads (unencrypted, low risk). (`ShadeGattClient.readCharacteristic` exists; opportunistic battery reads and the weekly sweep worker are still TODO.)
+2. ✅ Scanner + a raw debug screen listing MAC / RSSI / decoded state / hex payload — confirms offsets against real shades before any writes. Confirmed against real hardware: a Duette TDBU (typeId 8) decodes to the right capability from a live advertisement.
+3. ✅ Capability mapping and per-shade UI model. (`Capabilities`, `Shade`, and a per-shade detail screen that offers only the controls a shade's capability claims.)
+4. ✅ GATT connect + battery reads (unencrypted, low risk). (`BatteryReader` + the debug screen's per-shade Read battery button. Device-info characteristics and the weekly sweep worker are still TODO — the sweep is step 10.)
 5. Keystream import + first real write. (`FrameCipher.deriveKeystreamFromKey`, `KeystreamStore`, `ShadeGattClient.writeCommand` exist; the import UI is TODO.)
 6. Keystream derivation-from-capture flow, tilt, secondary, sequence handling, command queue. (`KeystreamDeriver`, `CommandQueue` exist; the guided capture UI is TODO.)
-7. Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command` exist.)
-8. `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Both exist; in-app buttons to drive them are TODO.)
-9. Glance widgets: 1×1, then the grid, then the config activity, with pending/failed states. (Stubbed with TODOs in `:widget` — deferred because this container has no Android SDK to compile/verify Glance code against.)
-10. Battery sweep worker and low-battery notifications.
-11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`.)
+7. ✅ Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command`, plus the shade list, room grouping and the naming/detail screen.)
+8. ✅ `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Per-rail sliders on the shade detail screen call `ActionRunner` directly. Nothing can succeed until step 5 supplies a keystream — the controls say so rather than failing opaquely.)
+9. ✅ Glance widgets: 1×1 and the grid, with a configuration activity and pending/failed states. (`ShadeActionWidget` + `ShadeActionWidgetReceiver`, `WidgetConfigActivity`, `WidgetStatus`, `CommandDispatch`. State is per widget *instance*, so two widgets pointing at the same action do not share a spinner. Not expedited work — see `CommandDispatch` for why that would crash below API 31.)
+10. ✅ Battery sweep worker, low-battery notifications **and a battery widget**. (`BatterySweepWorker`, on a user-chosen interval — daily to monthly, or off, defaulting to weekly — skipping mains-powered shades; `BatteryNotifier` posts one summary notification at or below `LOW_BATTERY_PERCENT`. `BatteryWidget` is the at-a-glance surface between the two: every battery-powered shade, worst first, never connecting to anything itself.)
+11. ✅ Quick Settings tile and launcher shortcuts. (`QuickSettingsTile` runs one designated action, chosen in the app's settings because a tile has one button and nowhere to put a picker; it does nothing from the lock screen — see "Security notes". `ActionShortcuts` publishes up to four dynamic shortcuts, republished whenever the action list changes, into the non-exported `RunActionActivity` trampoline.)
 12. Optional: Home Assistant bridge via a Python port of `:protocol` + `bleak` + an ESPHome BLE proxy.
 
 ## Verifying `:protocol`
@@ -77,17 +90,19 @@ GitHub-hosted runner, which has the SDK preinstalled.
 
 ## Versions that need confirming before the first full build
 
-`gradle/libs.versions.toml` marks each dependency `VERIFIED` (checked
-against Maven Central in-session) or `UNVERIFIED`. The AGP and every
-AndroidX version are `UNVERIFIED` because this container's network policy
-blocks `dl.google.com`/`maven.google.com` — the only place that metadata is
-published — so those numbers are reasonable-but-unconfirmed placeholders,
-not looked-up facts. Confirm against
+`gradle/libs.versions.toml` marks each dependency `VERIFIED` (looked up
+against Maven Central) or `UNVERIFIED`. AGP and every AndroidX line are
+`UNVERIFIED` because the container that scaffolded this project could not reach
+`dl.google.com`/`maven.google.com`, the only place that metadata is published.
+
+**That marker now means less than it used to.** CI has built the whole project
+green with these versions, so they demonstrably exist and work together. What
+remains unknown is whether they are *current*. Check
 [the AGP release notes](https://developer.android.com/build/releases/gradle-plugin)
-and [AndroidX release notes](https://developer.android.com/jetpack/androidx/versions)
-before relying on a full build, then remove the `UNVERIFIED` markers.
-Kotlin, kotlinx-coroutines and kotlinx-serialization-json are `VERIFIED`
-(Maven Central, reachable from this container).
+and [AndroidX release notes](https://developer.android.com/jetpack/androidx/versions),
+then drop the markers. `agp` and `compileSdk`/`targetSdk` deserve the most
+attention — targetSdk 35 may already be at or below the Play Store's floor.
+Dependabot is configured and can finally open PRs for these, now that CI runs.
 
 `androidx.security:security-crypto` (used by `KeystreamStore`, the encrypted
 keystream storage) has historically only shipped pre-1.0 / alpha releases
@@ -103,23 +118,75 @@ field, and a few others. All need real hardware to resolve.
 
 ## CI/CD
 
-- `.github/workflows/ci.yml` — builds `:protocol` tests standalone (no SDK
-  dependency), then `assembleDebug` + `test` across every module, on every
-  push/PR to the default branch.
-- `.github/workflows/release.yml` — on a `v*` tag: verifies the tag is on
-  the default branch and CI passed for that commit, builds an APK, and
-  attaches it to a GitHub release. **Produces an unsigned APK as scaffolded**
-  — add a signing config (commented-out steps in the workflow show the
-  keystore-secret pattern) before shipping a real release.
+- `.github/workflows/ci.yml` — runs `:protocol`'s tests first (fastest failure
+  signal), then `assembleDebug`, `test` and `assembleRelease` across every
+  module. Triggers on every branch, on PRs to the default branch, and on
+  manual dispatch. All three matter: the release gate below requires a CI run
+  for the exact commit being tagged, and pre-release tags are allowed to come
+  from feature branches.
+- `.github/workflows/release.yml` — on a `v*` tag: verifies the tag is on the
+  default branch and that CI passed for that commit, builds the APK, checks it
+  is signed and not debug-signed, then attaches it to a GitHub release.
+- `.github/workflows/lint-workflows.yml` — actionlint over
+  `.github/workflows/**` (checksum-verified binary), so a broken workflow file
+  is caught without waiting for the full Android build.
 - `.github/dependabot.yml` — weekly PRs for GitHub Actions and Gradle
   dependencies.
 
+### Release signing
+
+`app/build.gradle.kts` builds a signed release APK when these environment
+variables are set, and an **unsigned** one when they are not:
+
+| Variable | Release workflow secret |
+|---|---|
+| `RELEASE_KEYSTORE_PATH` | derived from `KEYSTORE_BASE64` |
+| `RELEASE_KEYSTORE_PASSWORD` | `KEYSTORE_PASSWORD` |
+| `RELEASE_KEY_ALIAS` | `KEY_ALIAS` |
+| `RELEASE_KEY_PASSWORD` | `KEY_PASSWORD` |
+
+Until those four repository secrets exist, the release workflow **fails
+instead of publishing**. That is deliberate: an unsigned APK cannot be
+installed (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`), so publishing one produces
+a release that looks fine and is useless to every user who downloads it.
+
+Generate a keystore with `keytool -genkeypair -keystore release.keystore
+-alias release -keyalg RSA -keysize 2048 -validity 10000`, then
+`base64 -w0 release.keystore` into the `KEYSTORE_BASE64` secret. Never commit
+the keystore — `.gitignore` already covers `*.keystore`/`*.jks`.
+
 ## Security notes
+
+**The Quick Settings tile does nothing from the lock screen, deliberately.**
+The spec asked for a lock-screen control; it is not wanted, and this tile
+moves physical objects in someone's home — a phone left on a table should not
+be a remote for the blinds. Two things follow. A tap goes through
+`unlockAndRun`, so Android demands the lock screen before anything is sent
+(and runs straight through when the device is already unlocked, so it costs
+the owner nothing). And a locked tile shows a generic name and "Unlock to
+use" rather than the action's own label: an action is named for where it is
+and what it does — "Bedroom close" — which is not a stranger's to read off a
+lock screen.
+
+**Launcher shortcuts run through a deliberately non-exported activity.** A
+shortcut's intent is started by the system under the *publishing* app's
+identity rather than the launcher's — AOSP's
+`LauncherAppsService.startShortcutInner` says so outright ("Note the target
+activity doesn't have to be exported") — so `RunActionActivity` needs no
+export and has no untrusted-input surface. Exporting it, which is easy to do
+by reflex, would have let any installed app move the shades by firing an
+intent at it.
 
 - The write keystream (spec §1.4/§4) is stored via `EncryptedSharedPreferences`
   (Android Keystore-backed), separate from the plain shade metadata blob —
-  see `KeystreamStore` vs `ShadeStore`.
+  see `KeystreamStore` vs `ShadeStore`. It is excluded from cloud backup and
+  device-to-device transfer (`data_extraction_rules.xml`, `backup_rules.xml`).
 - BLE permissions are scoped to `neverForLocation` since the app filters on
-  manufacturer data, not beacons.
+  manufacturer data, not beacons. Permissions for features that are not built
+  yet (foreground service, notifications) are deliberately **not** declared —
+  they go in alongside the code that needs them.
+- Release builds run R8 (`isMinifyEnabled = true`). `app/proguard-rules.pro`
+  keeps the two things reached reflectively: `@Serializable` models in `:data`
+  and `CommandWorker`, which `WorkManager` resolves by class name.
 - No network calls exist anywhere in this app (by design — no Gateway, no
   account) — nothing here talks to the internet at all.

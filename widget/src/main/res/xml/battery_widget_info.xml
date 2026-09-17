@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Wider and taller minimum than the action widget: this one lists shades with
+  a label and a reading each, and at one cell it could show neither.
+
+  No android:configure — there is nothing to configure. It shows every
+  battery-powered shade the app knows about, worst first, so it needs no
+  choosing and never goes stale against a renamed or forgotten shade.
+
+  updatePeriodMillis is 0 for a stronger reason than usual here: a periodic
+  wake-up would be a widget about battery life that spends battery life.
+  Redraws are pushed when ShadeStore changes, which is when there is
+  something new to draw.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/battery_widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

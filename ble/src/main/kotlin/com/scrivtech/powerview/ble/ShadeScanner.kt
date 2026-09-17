@@ -13,6 +13,7 @@ import com.scrivtech.powerview.protocol.AdvertisementParser
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.util.Locale
 
 /**
  * Scans for PowerView Gen 3 advertisements. See `docs/PROTOCOL.md` §1.2 and
@@ -77,7 +78,7 @@ public class ShadeScanner(private val context: Context) {
                         macAddress = result.device.address,
                         rssi = result.rssi,
                         shadeState = state,
-                        rawPayloadHex = payload.joinToString(" ") { "%02X".format(it) },
+                        rawPayloadHex = payload.joinToString(" ") { String.format(Locale.ROOT, "%02X", it) },
                         timestampMillis = System.currentTimeMillis(),
                     ),
                 )

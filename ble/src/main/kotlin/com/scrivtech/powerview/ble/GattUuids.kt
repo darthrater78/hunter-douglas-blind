@@ -28,7 +28,7 @@ public object GattUuids {
     /** Standard GATT Battery Service. */
     public val SERVICE_BATTERY: UUID = UUID.fromString("0000180F-0000-1000-8000-00805F9B34FB")
 
-    /** Battery level characteristic on [SERVICE_BATTERY]. Coarse bucket: 10/50/100 ~ low/medium/high. */
+    /** Battery level characteristic on [SERVICE_BATTERY]. A percentage, 0..100 — see `docs/PROTOCOL.md` §1. */
     public val CHARACTERISTIC_BATTERY_LEVEL: UUID = UUID.fromString("00002A19-0000-1000-8000-00805F9B34FB")
 
     /** Client Characteristic Configuration Descriptor — write to enable notifications, if supported. */

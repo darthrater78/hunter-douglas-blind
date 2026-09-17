@@ -19,9 +19,18 @@ advertiser with that company ID is a PowerView Gen 3 device.
 
 Standard GATT services are also present:
 - Device Information (`0x180A`) — vendor/model/hw/fw/serial.
-- Battery (`0x180F`, characteristic `0x2A19`) — coarse bucket (10/50/100 ≈
-  low/medium/high), not a real percentage. Needs a GATT connection but no
+- Battery (`0x180F`, characteristic `0x2A19`) — needs a GATT connection but no
   encryption key.
+
+  **Corrected 2026-09-17 against real hardware.** This section previously said
+  the value was a coarse 10/50/100 bucket rather than a real percentage, which
+  is what the openHAB binding's behaviour suggested. A Duette TDBU returned
+  **65**, which is not one of those buckets. `0x2A19` is defined by the
+  Bluetooth SIG as a uint8 percentage, 0..100, and the evidence so far is
+  consistent with these shades simply honouring that. Treat it as a percentage.
+  The old claim may still describe some units or older firmware — if you ever
+  see a device that only ever reports 10, 50 or 100, that is worth recording
+  here rather than assuming this note is wrong.
 
 ## 2. Reading state — advertisements, unencrypted, no connection
 
@@ -41,11 +50,18 @@ offset if you have a raw payload that still carries the company ID
 | primary | 3 | uint16 LE | `percent = clamp(raw / 40.0, 0, 100)` |
 | secondary | 5 | uint16 LE | `percent = clamp(raw / 40.0, 0, 100)` |
 | tilt | 7 | uint8 | `percent = clamp(raw, 0, 100)` (already a percent) |
-| velocity | 8 | uint8 | semantics unconfirmed |
+| velocity | 8 | uint8 | semantics unconfirmed — see §8, and note it is probably not a velocity |
 
 Fields are unaligned — read bytes manually (`AdvertisementParser` does this
 with explicit offsets, not a struct view). `secondary`/`tilt`/`velocity` are
 optional trailing fields; a short payload just omits them.
+
+**Confirmed against real hardware 2026-09-17.** A Duette TDBU broadcast
+`3C F8 08 00 00 09 00 00 C0` (9 bytes, company ID already stripped), which
+decodes as homeId 63548, typeId 8, primary 0.0%, secondary 0.225%, tilt 0,
+velocity 192 — and 9 bytes is exactly what the table above consumes, with no
+byte left over and none missing. A layout shifted by one would not fit. This
+payload is pinned as a regression test in `AdvertisementParserTest`.
 
 Keep one long-lived scan running rather than stopping/starting — matching
 advertisements arrive continuously, and Android throttles apps that
@@ -181,7 +197,11 @@ house.
   (`ShadeGattClient.writeCommand` probes `PROPERTY_WRITE_NO_RESPONSE` at
   runtime and picks accordingly — confirm what's actually seen).
 - Whether the sequence byte is validated (replay protection) or ignored.
-- Meaning of the `velocity` byte, and whether it's writable.
+- Meaning of the `velocity` byte, and whether it's writable. **The name is
+  probably wrong.** A stationary Duette TDBU reported `0xC0` (192) for it —
+  `0b1100_0000`, both high bits set, which reads like a flags/status byte
+  rather than any kind of speed. Worth watching what it does while a shade is
+  actually moving before trusting the label.
 - Whether frames longer than 13 bytes exist for other command classes.
 - Whether the shade rejects writes from an un-bonded central once enrolled.
 - Whether `0x2A19` (battery level) supports Notify (check

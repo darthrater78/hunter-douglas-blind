@@ -1,1 +1,108 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" />
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+          Fully-qualified class names, not the usual leading dot: this is a
+          library manifest, and a leading dot is resolved against the merged
+          application's package (com.scrivtech.powerview) rather than this
+          module's namespace, which would name classes that do not exist.
+
+          exported="true" is required, not a choice: the widget host sends
+          APPWIDGET_UPDATE from outside the app, and a non-exported receiver
+          would simply never run. It carries no permission and acts only on
+          widget ids the system hands it.
+        -->
+        <receiver
+            android:name="com.scrivtech.powerview.widget.ShadeActionWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/shade_action_widget_info" />
+        </receiver>
+
+        <!--
+          Also necessarily exported — the launcher starts it as part of
+          placing a widget. It treats its appWidgetId extra as untrusted and
+          checks it against the ids the system reports for this provider
+          before writing anything; see the class docs.
+
+          No android:theme: it inherits the application theme, so it matches
+          the app rather than pinning a second one that would have to be kept
+          in step with it.
+        -->
+        <activity
+            android:name="com.scrivtech.powerview.widget.WidgetConfigActivity"
+            android:exported="true"
+            android:label="@string/widget_config_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          Battery widget. Exported for the same reason as the action widget's
+          receiver: APPWIDGET_UPDATE comes from the widget host, outside the
+          app. It only ever reads what ShadeStore already holds and never
+          connects to a shade.
+        -->
+        <receiver
+            android:name="com.scrivtech.powerview.widget.BatteryWidgetReceiver"
+            android:exported="true"
+            android:label="@string/battery_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/battery_widget_info" />
+        </receiver>
+
+        <!--
+          Quick Settings tile (build order step 11). The BIND_QUICK_SETTINGS_TILE
+          permission is what makes exporting this safe: it restricts binding to
+          the system, so "exported" here does not mean reachable by other apps.
+
+          TODO: android:icon is a framework placeholder, like the launcher icon
+          in :app. A tile icon wants a monochrome vector sized for the QS grid;
+          replace both together when the app gets a real icon set.
+        -->
+        <service
+            android:name="com.scrivtech.powerview.widget.QuickSettingsTile"
+            android:exported="true"
+            android:icon="@android:drawable/ic_menu_sort_by_size"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <!--
+          Launcher-shortcut trampoline. NOT exported, and it does not need to
+          be: the system starts a shortcut's intent under the publishing
+          app's identity, not the launcher's, so a non-exported activity is
+          reachable this way and no other. AOSP's
+          LauncherAppsService.startShortcutInner states it outright ("Note
+          the target activity doesn't have to be exported"). Exporting it
+          would let any installed app move the shades.
+
+          Translucent rather than Theme.NoDisplay: it finishes in onCreate so
+          either would do, but NoDisplay crashes outright if an activity ever
+          reaches onResume, and that is a sharp edge to leave for whoever
+          edits this next.
+        -->
+        <activity
+            android:name="com.scrivtech.powerview.widget.RunActionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+    </application>
+</manifest>
