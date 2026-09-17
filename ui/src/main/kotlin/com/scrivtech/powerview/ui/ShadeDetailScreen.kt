@@ -11,13 +11,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,7 +28,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.Shade
+import kotlin.math.roundToInt
 
 /**
  * Build order step 7: naming a shade and filing it in a room.
@@ -43,11 +48,18 @@ public fun ShadeDetailScreen(
     isSetUp: Boolean,
     batteryReading: Boolean,
     batteryMessage: String?,
+    readiness: Readiness?,
+    commandInFlight: Boolean,
+    commandOutcome: CommandOutcome?,
     onSave: (label: String, room: String?, mainsPowered: Boolean) -> Unit,
     onForget: () -> Unit,
     onReadBattery: () -> Unit,
+    onSendPosition: (primary: Double?, secondary: Double?, tilt: Int?) -> Unit,
+    onRefreshReadiness: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    LaunchedEffect(shade.macAddress) { onRefreshReadiness() }
+
     // Keyed on the MAC so switching shades reseeds, but a later advertisement
     // for the same shade does not overwrite what the user is part-way through
     // typing.
@@ -118,6 +130,16 @@ public fun ShadeDetailScreen(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(if (isSetUp) "Save" else "Add this shade")
+        }
+
+        if (isSetUp) {
+            ShadeControlsCard(
+                shade = shade,
+                readiness = readiness,
+                commandInFlight = commandInFlight,
+                commandOutcome = commandOutcome,
+                onSendPosition = onSendPosition,
+            )
         }
 
         ShadeFactsCard(shade = shade)
@@ -206,5 +228,170 @@ private fun ShadeFactsCard(shade: Shade) {
             Text("Type: $capabilityText", style = MaterialTheme.typography.bodySmall)
             Text("Home: ${shade.homeId ?: "unknown"}", style = MaterialTheme.typography.bodySmall)
         }
+    }
+}
+
+/**
+ * Build order step 8: the in-app buttons that drive
+ * [com.scrivtech.powerview.data.ActionRunner] directly.
+ *
+ * Each rail sends only its own field. That is not a simplification — the
+ * command frame carries an explicit "unset" sentinel per field, so leaving
+ * secondary and tilt alone while moving the primary is exactly what the
+ * hardware is being told, rather than the app re-sending a value it merely
+ * believes to be current.
+ *
+ * Only the fields the shade's capability claims are offered. Sending a tilt to
+ * a shade with no tilt motor is at best ignored, and the frame layout itself is
+ * still unconfirmed against hardware (`docs/PROTOCOL.md` §3), so there is no
+ * reason to send bytes nobody asked for.
+ */
+@Composable
+private fun ShadeControlsCard(
+    shade: Shade,
+    readiness: Readiness?,
+    commandInFlight: Boolean,
+    commandOutcome: CommandOutcome?,
+    onSendPosition: (primary: Double?, secondary: Double?, tilt: Int?) -> Unit,
+) {
+    val capability = shade.capabilities?.capability
+    val blocked = readiness as? Readiness.Blocked
+
+    var primary by rememberSaveable(shade.macAddress) {
+        mutableStateOf(shade.state?.primaryPercent?.toFloat() ?: 0f)
+    }
+    var secondary by rememberSaveable(shade.macAddress) {
+        mutableStateOf(shade.state?.secondaryPercent?.toFloat() ?: 0f)
+    }
+    var tilt by rememberSaveable(shade.macAddress) {
+        mutableStateOf(shade.state?.tiltPercent?.toFloat() ?: 0f)
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text("Controls", style = MaterialTheme.typography.titleMedium)
+
+            // Percentages rather than Open/Close. PowerView's convention puts 0
+            // at fully open, but that is inherited from the openHAB binding and
+            // unconfirmed here, and a mislabelled button on a motor is worse
+            // than an unlabelled number.
+            Text(
+                "0% is fully open by PowerView's convention. That has not been confirmed " +
+                    "on real hardware yet — check against the window before trusting it.",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(bottom = 4.dp),
+            )
+
+            if (blocked != null) {
+                ControlsBlockedNotice(reason = blocked.reason)
+            }
+
+            val enabled = blocked == null && !commandInFlight
+
+            if (capability == null || capability.hasPrimaryRail) {
+                RailControl(
+                    label = "Primary",
+                    value = primary,
+                    onValueChange = { primary = it },
+                    onSend = { onSendPosition(primary.toDouble(), null, null) },
+                    enabled = enabled,
+                )
+            }
+
+            if (capability?.hasSecondaryRail == true) {
+                RailControl(
+                    label = "Secondary",
+                    value = secondary,
+                    onValueChange = { secondary = it },
+                    onSend = { onSendPosition(null, secondary.toDouble(), null) },
+                    enabled = enabled,
+                )
+            }
+
+            if (capability?.hasTilt == true) {
+                RailControl(
+                    label = "Tilt",
+                    value = tilt,
+                    onValueChange = { tilt = it },
+                    onSend = { onSendPosition(null, null, tilt.roundToInt()) },
+                    enabled = enabled,
+                )
+            }
+
+            if (commandInFlight) {
+                Text(
+                    "Sending…",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            } else if (commandOutcome != null) {
+                Text(
+                    text = commandOutcomeText(commandOutcome),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (commandOutcome == CommandOutcome.Sent) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    },
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Why the controls are inert. Shown instead of letting the buttons look live:
+ * no [CommandOutcome.NotAttempted] reason is fixed by pressing harder, and for
+ * a shade that is otherwise working the missing keystream is the expected state
+ * until onboarding exists.
+ */
+@Composable
+private fun ControlsBlockedNotice(reason: CommandOutcome.NotAttempted) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = if (reason == CommandOutcome.NotAttempted.NoKeystream) {
+                    "Setup not finished"
+                } else {
+                    "Can't send commands"
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Text(commandOutcomeText(reason), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun RailControl(
+    label: String,
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    onSend: () -> Unit,
+    enabled: Boolean,
+) {
+    Column(modifier = Modifier.padding(top = 8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("$label ${value.roundToInt()}%", style = MaterialTheme.typography.bodyLarge)
+            Button(onClick = onSend, enabled = enabled) { Text("Send") }
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 0f..100f,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }

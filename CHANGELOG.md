@@ -37,6 +37,21 @@ All notable changes to this project are documented here.
   than a speed.
 
 ### Added
+- **In-app controls that drive `ActionRunner` directly** (build order step 8).
+  The shade detail screen offers a slider and Send per rail, and only for the
+  rails the shade's capability claims. Each rail sends only its own field: the
+  command frame carries an explicit unset sentinel per field, so leaving tilt
+  alone is what the hardware is actually told, rather than the app re-sending a
+  value it believes to be current.
+- Controls explain themselves before they are pressed. `ActionRunner.checkReadiness`
+  runs when the screen opens, and a blocked shade shows why — most often
+  "Setup not finished", since no keystream exists until build order step 5.
+  Nothing here can move a shade yet; the UI says that plainly instead of
+  offering a button that silently does nothing.
+- Positions are offered as percentages rather than Open/Close, with a note that
+  PowerView's "0% is fully open" convention is inherited from the openHAB
+  binding and not yet confirmed on hardware. A mislabelled button on a motor is
+  worse than an unlabelled number.
 - **The app has a real shade list** (build order step 7). `PowerViewApp` hosts a
   shade list grouped into rooms, and a per-shade detail screen for naming it,
   filing it in a room, marking it mains-powered, reading its battery and

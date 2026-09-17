@@ -25,7 +25,12 @@ public class MainActivity : ComponentActivity() {
 
     private val viewModel: ShadeListViewModel by viewModels {
         val app = application as PowerViewApplication
-        ShadeListViewModel.Factory(app.shadeRepository, app.batteryReader, app.shadeStore)
+        ShadeListViewModel.Factory(
+            app.shadeRepository,
+            app.batteryReader,
+            app.shadeStore,
+            app.actionRunner,
+        )
     }
 
     private val requestBlePermissions = registerForActivityResult(

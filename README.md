@@ -45,12 +45,12 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 
 1. ✅ `:protocol` + unit tests against the sniffed test vectors. No hardware needed.
 2. ✅ Scanner + a raw debug screen listing MAC / RSSI / decoded state / hex payload — confirms offsets against real shades before any writes. Confirmed against real hardware: a Duette TDBU (typeId 8) decodes to the right capability from a live advertisement.
-3. Capability mapping and per-shade UI model. (`Capabilities`, `Shade` exist.)
+3. ✅ Capability mapping and per-shade UI model. (`Capabilities`, `Shade`, and a per-shade detail screen that offers only the controls a shade's capability claims.)
 4. ✅ GATT connect + battery reads (unencrypted, low risk). (`BatteryReader` + the debug screen's per-shade Read battery button. Device-info characteristics and the weekly sweep worker are still TODO — the sweep is step 10.)
 5. Keystream import + first real write. (`FrameCipher.deriveKeystreamFromKey`, `KeystreamStore`, `ShadeGattClient.writeCommand` exist; the import UI is TODO.)
 6. Keystream derivation-from-capture flow, tilt, secondary, sequence handling, command queue. (`KeystreamDeriver`, `CommandQueue` exist; the guided capture UI is TODO.)
-7. Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command` exist.)
-8. `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Both exist; in-app buttons to drive them are TODO.)
+7. ✅ Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command`, plus the shade list, room grouping and the naming/detail screen.)
+8. ✅ `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Per-rail sliders on the shade detail screen call `ActionRunner` directly. Nothing can succeed until step 5 supplies a keystream — the controls say so rather than failing opaquely.)
 9. Glance widgets: 1×1, then the grid, then the config activity, with pending/failed states. (Stubbed with TODOs in `:widget` — deferred because this container has no Android SDK to compile/verify Glance code against.)
 10. Battery sweep worker and low-battery notifications.
 11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`.)

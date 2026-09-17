@@ -1,6 +1,7 @@
 package com.scrivtech.powerview.ui
 
 import com.scrivtech.powerview.data.BatteryLevel
+import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.Shade
 import com.scrivtech.powerview.data.batteryLevelOf
 import java.time.Duration
@@ -117,3 +118,63 @@ internal fun groupIntoRooms(shades: List<Shade>): List<Pair<String, List<Shade>>
     val unfiled = shades.filter { it.room.isNullOrBlank() }
     return if (unfiled.isEmpty()) named else named + (NO_ROOM_LABEL to unfiled.sortedBy { it.label })
 }
+
+/**
+ * What to tell the user about one command's result.
+ *
+ * Two rules hold this together. A [CommandOutcome.NotAttempted] reason says
+ * what to *do* — none of them is fixed by pressing the button again, so none
+ * of them gets phrased as a failure to retry. And the write stage is described
+ * as genuinely uncertain, because it is: the frame may have reached the shade
+ * with only the acknowledgement lost, so claiming nothing happened would be a
+ * guess, and on a device that physically moves it is the wrong guess to make
+ * confidently.
+ */
+internal fun commandOutcomeText(outcome: CommandOutcome): String = when (outcome) {
+    CommandOutcome.Sent -> "Sent."
+
+    CommandOutcome.NotAttempted.NoKeystream ->
+        "This home has no key yet, so nothing was sent. Controlling shades needs " +
+            "keystream setup, which is not built yet."
+
+    CommandOutcome.NotAttempted.NoHomeId ->
+        "This shade has not been heard from yet, so the home it belongs to is " +
+            "unknown and nothing was sent. Bring it in range and let it be scanned."
+
+    CommandOutcome.NotAttempted.UnknownShade ->
+        "This shade is not set up, so nothing was sent. Give it a name first."
+
+    CommandOutcome.NotAttempted.MissingConnectPermission ->
+        "Nothing was sent: the app is not allowed to connect to nearby devices. " +
+            "Grant the Nearby devices permission in system settings."
+
+    CommandOutcome.NotAttempted.BluetoothOff ->
+        "Nothing was sent: Bluetooth is off."
+
+    CommandOutcome.NotAttempted.MalformedAddress ->
+        "Nothing was sent: this shade's stored address is not valid. Forget it and set it up again."
+
+    is CommandOutcome.TransportFailed -> when (outcome.stage) {
+        CommandOutcome.TransportFailed.Stage.CONNECT ->
+            "Could not reach the shade, so it did not move. It may be out of range or asleep."
+
+        CommandOutcome.TransportFailed.Stage.DISCOVER ->
+            "Connected, but the shade did not report its controls, so it did not move. Try again."
+
+        CommandOutcome.TransportFailed.Stage.WRITE ->
+            "The command was not acknowledged. The shade may or may not have moved — " +
+                "check it, or wait for its next position report."
+
+        CommandOutcome.TransportFailed.Stage.PERMISSION_REVOKED ->
+            "The Nearby devices permission was withdrawn mid-command, so the shade may or " +
+                "may not have moved."
+    }
+}
+
+/**
+ * Whether a [CommandOutcome] is worth offering a retry for. Retrying a
+ * [CommandOutcome.NotAttempted] cannot help — the user has something to fix
+ * first — so the button would only invite them to hammer it.
+ */
+internal fun isWorthRetrying(outcome: CommandOutcome): Boolean =
+    outcome is CommandOutcome.TransportFailed

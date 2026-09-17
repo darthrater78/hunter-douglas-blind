@@ -1,10 +1,12 @@
 package com.scrivtech.powerview.ui
 
+import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.Shade
 import com.scrivtech.powerview.protocol.CapabilityLookup
 import com.scrivtech.powerview.protocol.ShadeCapability
 import com.scrivtech.powerview.protocol.ShadeState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
@@ -207,5 +209,75 @@ class ShadeFormattingTest {
     @Test
     fun `a read battery shows the percentage`() {
         assertEquals("65%", batterySummary(shade(batteryPercent = 65)))
+    }
+
+    // ---- commandOutcomeText ----
+
+    /**
+     * The whole reason CommandOutcome exists. With keystream onboarding built
+     * last, this is what every control press produces, and it has to read as
+     * unfinished setup rather than as a malfunction.
+     */
+    @Test
+    fun `a missing keystream explains itself as setup, not as a failure`() {
+        val text = commandOutcomeText(CommandOutcome.NotAttempted.NoKeystream)
+
+        assertTrue(text, text.contains("no key"))
+        assertTrue(text, text.contains("nothing was sent"))
+    }
+
+    /**
+     * A failed write is the one outcome where the shade's position is genuinely
+     * unknown, and the text must not claim otherwise in either direction.
+     */
+    @Test
+    fun `a failed write admits the shade may have moved`() {
+        val text = commandOutcomeText(
+            CommandOutcome.TransportFailed(CommandOutcome.TransportFailed.Stage.WRITE),
+        )
+
+        assertTrue(text, text.contains("may or may not have moved"))
+    }
+
+    @Test
+    fun `a failed connect states the shade did not move`() {
+        val text = commandOutcomeText(
+            CommandOutcome.TransportFailed(CommandOutcome.TransportFailed.Stage.CONNECT),
+        )
+
+        assertTrue(text, text.contains("did not move"))
+    }
+
+    @Test
+    fun `every outcome has non-empty text`() {
+        val outcomes = listOf(
+            CommandOutcome.Sent,
+            CommandOutcome.NotAttempted.NoKeystream,
+            CommandOutcome.NotAttempted.NoHomeId,
+            CommandOutcome.NotAttempted.UnknownShade,
+            CommandOutcome.NotAttempted.MissingConnectPermission,
+            CommandOutcome.NotAttempted.BluetoothOff,
+            CommandOutcome.NotAttempted.MalformedAddress,
+        ) + CommandOutcome.TransportFailed.Stage.entries.map {
+            CommandOutcome.TransportFailed(it)
+        }
+
+        for (outcome in outcomes) {
+            assertTrue(outcome.toString(), commandOutcomeText(outcome).isNotBlank())
+        }
+    }
+
+    /**
+     * Retrying a NotAttempted outcome cannot help — the user has something to
+     * fix first — so offering the button would just invite them to hammer it.
+     */
+    @Test
+    fun `only transport failures are worth retrying`() {
+        assertTrue(
+            isWorthRetrying(CommandOutcome.TransportFailed(CommandOutcome.TransportFailed.Stage.CONNECT)),
+        )
+        assertFalse(isWorthRetrying(CommandOutcome.NotAttempted.NoKeystream))
+        assertFalse(isWorthRetrying(CommandOutcome.NotAttempted.BluetoothOff))
+        assertFalse(isWorthRetrying(CommandOutcome.Sent))
     }
 }

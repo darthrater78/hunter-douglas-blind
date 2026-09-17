@@ -3,8 +3,11 @@ package com.scrivtech.powerview.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.scrivtech.powerview.data.ActionRunner
 import com.scrivtech.powerview.data.BatteryReadResult
 import com.scrivtech.powerview.data.BatteryReader
+import com.scrivtech.powerview.data.Command
+import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.ScanState
 import com.scrivtech.powerview.data.Shade
 import com.scrivtech.powerview.data.ShadeMetadata
@@ -32,14 +35,36 @@ public data class BatteryReadUiState(
 )
 
 /**
- * Backs [DebugScanScreen] (build order step 2) and, later, the real shade
- * list. Deliberately thin — it does no BLE or persistence work itself, only
- * reshapes [ShadeRepository.shades] for display and delegates the battery read.
+ * Whether a shade can be commanded at all, as far as can be known without
+ * touching BLE. Worth showing before a button is pressed rather than after:
+ * every [Readiness.Blocked] reason is something the user has to go and fix, so
+ * a button that looks live and then explains itself wastes a trip to the shade.
+ */
+public sealed interface Readiness {
+    public data object Checking : Readiness
+    public data object Ready : Readiness
+    public data class Blocked(public val reason: CommandOutcome.NotAttempted) : Readiness
+}
+
+/** Transient per-shade state for in-app commands (build order step 8). */
+public data class CommandUiState(
+    public val inFlight: Set<String> = emptySet(),
+    public val outcomes: Map<String, CommandOutcome> = emptyMap(),
+    public val readiness: Map<String, Readiness> = emptyMap(),
+)
+
+/**
+ * Backs [DebugScanScreen] (build order step 2) and the shade list and detail
+ * screens (step 7), including the in-app command buttons of step 8.
+ * Deliberately thin — it does no BLE or persistence work itself, only reshapes
+ * [ShadeRepository.shades] for display and delegates to [BatteryReader] and
+ * [ActionRunner].
  */
 public class ShadeListViewModel(
     private val repository: ShadeRepository,
     private val batteryReader: BatteryReader,
     private val shadeStore: ShadeStore,
+    private val actionRunner: ActionRunner,
 ) : ViewModel() {
 
     public val shades: StateFlow<List<Shade>> = repository.shades
@@ -67,6 +92,9 @@ public class ShadeListViewModel(
 
     private val _batteryReads = MutableStateFlow(BatteryReadUiState())
     public val batteryReads: StateFlow<BatteryReadUiState> = _batteryReads.asStateFlow()
+
+    private val _commands = MutableStateFlow(CommandUiState())
+    public val commands: StateFlow<CommandUiState> = _commands.asStateFlow()
 
     /** Re-attempts the scan, e.g. after the user grants the permission or enables Bluetooth. */
     public fun retryScan() {
@@ -146,15 +174,85 @@ public class ShadeListViewModel(
         viewModelScope.launch { shadeStore.remove(macAddress) }
     }
 
+    /**
+     * Asks [ActionRunner] whether [macAddress] could be commanded right now.
+     * Cheap — it touches storage and the Bluetooth adapter, never the shade —
+     * so the detail screen can call it on open and again after any command.
+     */
+    public fun refreshReadiness(macAddress: String) {
+        _commands.update { it.copy(readiness = it.readiness + (macAddress to Readiness.Checking)) }
+
+        viewModelScope.launch {
+            val blocked = actionRunner.checkReadiness(macAddress)
+            val readiness = blocked?.let(Readiness::Blocked) ?: Readiness.Ready
+            _commands.update { it.copy(readiness = it.readiness + (macAddress to readiness)) }
+        }
+    }
+
+    /**
+     * Sends one position command to one shade — build order step 8's "driven
+     * from in-app buttons first".
+     *
+     * Null fields leave that rail or the tilt untouched, which is a property of
+     * the frame itself (`CommandFrameBuilder` writes an explicit unset
+     * sentinel), not something simulated here. A second press while one is in
+     * flight is ignored rather than queued: these take seconds, and stacking
+     * them up behind each other only makes the shade fight itself.
+     */
+    public fun sendPosition(
+        macAddress: String,
+        primaryPercent: Double? = null,
+        secondaryPercent: Double? = null,
+        tiltPercent: Int? = null,
+    ) {
+        if (macAddress in _commands.value.inFlight) return
+
+        _commands.update {
+            it.copy(
+                inFlight = it.inFlight + macAddress,
+                outcomes = it.outcomes - macAddress,
+            )
+        }
+
+        viewModelScope.launch {
+            val outcome = actionRunner.send(
+                Command(
+                    macAddress = macAddress,
+                    primaryPercent = primaryPercent,
+                    secondaryPercent = secondaryPercent,
+                    tiltPercent = tiltPercent,
+                ),
+            )
+
+            _commands.update {
+                it.copy(
+                    inFlight = it.inFlight - macAddress,
+                    outcomes = it.outcomes + (macAddress to outcome),
+                )
+            }
+
+            // A command can fail for a reason that also changes readiness —
+            // Bluetooth switched off mid-session, the permission revoked — so
+            // re-check rather than leaving a stale "Ready" next to a failure.
+            refreshReadiness(macAddress)
+        }
+    }
+
+    /** Clears the last command result for [macAddress], e.g. when its message is dismissed. */
+    public fun clearCommandOutcome(macAddress: String) {
+        _commands.update { it.copy(outcomes = it.outcomes - macAddress) }
+    }
+
     public class Factory(
         private val repository: ShadeRepository,
         private val batteryReader: BatteryReader,
         private val shadeStore: ShadeStore,
+        private val actionRunner: ActionRunner,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(ShadeListViewModel::class.java))
-            return ShadeListViewModel(repository, batteryReader, shadeStore) as T
+            return ShadeListViewModel(repository, batteryReader, shadeStore, actionRunner) as T
         }
     }
 }

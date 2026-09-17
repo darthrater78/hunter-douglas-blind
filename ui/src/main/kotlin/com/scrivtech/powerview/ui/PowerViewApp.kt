@@ -38,6 +38,7 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
     val savedMacAddresses by viewModel.savedMacAddresses.collectAsState()
     val scanState by viewModel.scanState.collectAsState()
     val batteryReads by viewModel.batteryReads.collectAsState()
+    val commands by viewModel.commands.collectAsState()
 
     val selectedShade = selectedMac?.let { mac -> shades.firstOrNull { it.macAddress == mac } }
 
@@ -95,6 +96,9 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
                     isSetUp = shade.macAddress in savedMacAddresses,
                     batteryReading = shade.macAddress in batteryReads.inFlight,
                     batteryMessage = batteryReads.messages[shade.macAddress],
+                    readiness = commands.readiness[shade.macAddress],
+                    commandInFlight = shade.macAddress in commands.inFlight,
+                    commandOutcome = commands.outcomes[shade.macAddress],
                     onSave = { label, room, mainsPowered ->
                         viewModel.saveShade(shade.macAddress, label, room, mainsPowered)
                         goToList()
@@ -104,6 +108,10 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
                         goToList()
                     },
                     onReadBattery = { viewModel.readBattery(shade.macAddress) },
+                    onSendPosition = { primary, secondary, tilt ->
+                        viewModel.sendPosition(shade.macAddress, primary, secondary, tilt)
+                    },
+                    onRefreshReadiness = { viewModel.refreshReadiness(shade.macAddress) },
                     modifier = content,
                 )
             }
