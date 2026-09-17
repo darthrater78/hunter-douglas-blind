@@ -8,7 +8,14 @@ on:
     # feature branch. If CI never ran there, that tag can never be released.
     branches: ['**']
   pull_request:
-    branches: [main, master]
+    # Any base branch, for the same reason the push trigger takes any branch:
+    # this repository has no main or master. Its default branch is the one the
+    # work is on, so `[main, master]` matched nothing and never had — every
+    # pull request opened here, Dependabot's included, ran no checks at all
+    # from this trigger. Four of the seven Dependabot PRs open in September
+    # 2026 had therefore never been built once, and showed an empty check list
+    # rather than a red one, which reads far too much like "fine".
+    branches: ['**']
   # The gate's error message tells you to dispatch CI by hand when no run
   # exists for a commit. That advice only works if this trigger is here.
   workflow_dispatch:
@@ -17,7 +24,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # head_ref before ref, because the two triggers above now overlap: a pull
+  # request inside this repository fires `push` on the branch AND
+  # `pull_request` on the same commits, and `github.ref` differs between them
+  # (refs/heads/<branch> versus refs/pull/<n>/merge) so they would land in
+  # separate groups and build the same tree twice. `github.head_ref` is the
+  # branch name on a pull_request event and empty everywhere else, so this
+  # collapses the pair into one group and leaves plain branch pushes exactly
+  # as they were.
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -30,13 +45,13 @@ jobs:
           persist-credentials: false
 
       - name: Set up JDK
-        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4.4.4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       # Runs first because it is the fastest failure signal in the build: the
       # frame/keystream math is the part with real test coverage, so a
@@ -60,7 +75,7 @@ jobs:
       # nothing to download, which is the whole point of a CI build for an app.
       # Retention is short because these are throwaway test builds.
       - name: Upload debug APK
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: powerview-debug-apk-${{ github.sha }}
           path: app/build/outputs/apk/debug/*.apk
