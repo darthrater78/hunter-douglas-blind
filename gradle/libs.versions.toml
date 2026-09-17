@@ -1,13 +1,15 @@
 # Dependency version catalog.
 #
-# Versions marked VERIFIED were looked up against Maven Central from this
-# session (see chat for the lookup). Versions marked UNVERIFIED could not be
-# checked: this container's network policy blocks dl.google.com /
-# maven.google.com, which is the only place AndroidX and AGP metadata is
-# published. Confirm each UNVERIFIED line against
+# VERIFIED = looked up against Maven Central. UNVERIFIED = could not be checked
+# when written, because the scaffolding container's network policy blocked
+# dl.google.com / maven.google.com, the only place AndroidX and AGP metadata is
+# published.
+#
+# UNVERIFIED no longer means "might not work": CI has built the whole project
+# green on these versions. It means "not known to be current". Confirm against
 # https://developer.android.com/build/releases/gradle-plugin and
-# https://developer.android.com/jetpack/androidx/versions before the first
-# real build, then delete this notice.
+# https://developer.android.com/jetpack/androidx/versions, then delete the
+# markers. agp and compileSdk/targetSdk are the ones most likely to be stale.
 
 [versions]
 # Build tooling
@@ -52,6 +54,7 @@ androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-
 androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
 
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+androidx-compose-runtime = { module = "androidx.compose.runtime:runtime" }
 androidx-compose-ui = { module = "androidx.compose.ui:ui" }
 androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
