@@ -4,6 +4,7 @@ import com.scrivtech.powerview.data.ActionResult
 import com.scrivtech.powerview.data.BatteryLevel
 import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.Shade
+import com.scrivtech.powerview.data.ShadeAction
 import com.scrivtech.powerview.data.batteryLevelOf
 import java.time.Duration
 import java.time.Instant
@@ -213,4 +214,16 @@ internal fun actionResultText(
             "Some shades did not respond: ${names.joinToString(", ")}."
         }
     }
+}
+
+/**
+ * How many shades an action would move, for the Quick Settings tile picker.
+ *
+ * A tile is one tap, reachable from the lock screen, so how much it does is
+ * worth stating before it is chosen rather than after it is pressed.
+ */
+internal fun tileActionDescription(action: ShadeAction): String = when (action.commands.size) {
+    0 -> "No shades — this action does nothing."
+    1 -> "1 shade"
+    else -> "${action.commands.size} shades"
 }

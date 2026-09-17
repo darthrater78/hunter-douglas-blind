@@ -1,6 +1,7 @@
 package com.scrivtech.powerview.widget
 
 import com.scrivtech.powerview.data.ActionIcon
+import com.scrivtech.powerview.data.Command
 import com.scrivtech.powerview.data.ShadeAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -157,5 +158,126 @@ class WidgetPresentationTest {
         assertTrue(isSlotEnabled(WidgetSlot("a", SlotRun.FAILED), action("a")))
         assertFalse(isSlotEnabled(WidgetSlot("a", SlotRun.PENDING), action("a")))
         assertFalse(isSlotEnabled(WidgetSlot("a", SlotRun.IDLE), null))
+    }
+}
+
+class TilePresentationTest {
+
+    @Test
+    fun `a locked tile gives nothing away`() {
+        // Not the action's name, not whether the last run failed, not whether
+        // one is in flight. A tile is visible to whoever holds the phone.
+        for (hasAction in listOf(false, true)) {
+            for (run in SlotRun.entries) {
+                assertEquals(
+                    "hasAction=$hasAction run=$run",
+                    "Unlock to use",
+                    tileSubtitle(hasAction = hasAction, run = run, locked = true),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a locked tile shows the generic name, never the action's`() {
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel("Bedroom close", locked = true))
+        assertEquals("Bedroom close", tileLabel("Bedroom close", locked = false))
+    }
+
+    @Test
+    fun `an unnamed or missing action falls back to the generic name`() {
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel(null, locked = false))
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel("", locked = false))
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel("   ", locked = false))
+    }
+
+    @Test
+    fun `an unconfigured tile points at the app whatever the run state`() {
+        // A deleted action and a never-chosen one are the same thing here:
+        // nothing to run, and the same trip into the app to fix it.
+        for (run in SlotRun.entries) {
+            assertEquals(
+                "run=$run",
+                "Choose an action in the app",
+                tileSubtitle(hasAction = false, run = run, locked = false),
+            )
+        }
+    }
+
+    @Test
+    fun `an unlocked configured tile reports its last run`() {
+        assertEquals("Tap to run", tileSubtitle(hasAction = true, run = SlotRun.IDLE, locked = false))
+        assertEquals("Sending…", tileSubtitle(hasAction = true, run = SlotRun.PENDING, locked = false))
+        assertEquals(
+            "Last run failed",
+            tileSubtitle(hasAction = true, run = SlotRun.FAILED, locked = false),
+        )
+    }
+
+    @Test
+    fun `every subtitle is non-blank`() {
+        for (locked in listOf(false, true)) {
+            for (hasAction in listOf(false, true)) {
+                for (run in SlotRun.entries) {
+                    assertTrue(tileSubtitle(hasAction, run, locked).isNotBlank())
+                }
+            }
+        }
+    }
+}
+
+class ShortcutActionsTest {
+
+    private fun action(id: String, label: String, commands: Int = 1) = ShadeAction(
+        id = id,
+        label = label,
+        icon = ActionIcon.CUSTOM,
+        commands = (1..commands).map { Command(macAddress = "AA:BB:CC:DD:EE:0$it") },
+    )
+
+    @Test
+    fun `actions that would move nothing are dropped`() {
+        // A launcher shortcut that does nothing is indistinguishable from a
+        // broken one, and the editor can produce a zero-command action.
+        val kept = shortcutActions(listOf(action("a", "Empty", commands = 0), action("b", "Real")))
+        assertEquals(listOf("b"), kept.map { it.id })
+    }
+
+    @Test
+    fun `blank labels are dropped rather than shown as an unnamed row`() {
+        val kept = shortcutActions(listOf(action("a", "   "), action("b", "Named")))
+        assertEquals(listOf("b"), kept.map { it.id })
+    }
+
+    @Test
+    fun `order is alphabetical and case-insensitive`() {
+        val kept = shortcutActions(
+            listOf(action("a", "zebra"), action("b", "Apple"), action("c", "mango")),
+        )
+        assertEquals(listOf("Apple", "mango", "zebra"), kept.map { it.label })
+    }
+
+    @Test
+    fun `the cap is applied after filtering, not before`() {
+        // Otherwise a few empty actions sorting early would silently eat the
+        // shortcut slots of real ones.
+        val actions = (1..3).map { action("empty$it", "AAA empty $it", commands = 0) } +
+            (1..3).map { action("real$it", "Real $it") }
+
+        val kept = shortcutActions(actions, max = 2)
+        assertEquals(listOf("real1", "real2"), kept.map { it.id })
+    }
+
+    @Test
+    fun `a zero or negative cap yields nothing rather than throwing`() {
+        // getMaxShortcutCountPerActivity is a system value; do not assume it
+        // is sane.
+        assertEquals(emptyList<ShadeAction>(), shortcutActions(listOf(action("a", "A")), max = 0))
+        assertEquals(emptyList<ShadeAction>(), shortcutActions(listOf(action("a", "A")), max = -1))
+    }
+
+    @Test
+    fun `no actions means no shortcuts`() {
+        assertEquals(emptyList<ShadeAction>(), shortcutActions(emptyList()))
     }
 }

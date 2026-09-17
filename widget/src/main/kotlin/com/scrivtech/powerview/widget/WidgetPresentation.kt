@@ -154,3 +154,77 @@ internal fun slotStatus(run: SlotRun): String? = when (run) {
 /** True when a tap on this slot should do nothing. */
 internal fun isSlotEnabled(slot: WidgetSlot, action: ShadeAction?): Boolean =
     action != null && slot.run != SlotRun.PENDING
+
+// --- Quick Settings tile (build order step 11) -----------------------------
+//
+// The tile shares this file rather than having its own because it shares the
+// vocabulary: one action, one run state, the same three outcomes. What it
+// does not share is the widget's per-instance storage — a tile is a
+// singleton, so its run state is held in memory and the wording below is the
+// only part worth testing.
+
+/** Shown as the tile's label when it has no action to name. */
+internal const val TILE_UNCONFIGURED_LABEL: String = "PowerView"
+
+/**
+ * The tile's second line (API 29+).
+ *
+ * [locked] wins over everything else, and deliberately so. A locked device
+ * gets no detail at all — not the action's name, not whether the last run
+ * failed — because the tile is visible to whoever is holding the phone and
+ * none of that is theirs to read. See [tileLabel].
+ *
+ * [hasAction] is false both when nothing has been chosen and when the chosen
+ * action has since been deleted. Those are the same thing from the tile's
+ * point of view — there is nothing to run — and the fix for both is the same
+ * trip into the app, so they read the same.
+ */
+internal fun tileSubtitle(hasAction: Boolean, run: SlotRun, locked: Boolean): String = when {
+    locked -> "Unlock to use"
+    !hasAction -> "Choose an action in the app"
+    run == SlotRun.PENDING -> "Sending…"
+    run == SlotRun.FAILED -> "Last run failed"
+    else -> "Tap to run"
+}
+
+/**
+ * The tile's label: the action's name, unless the device is locked.
+ *
+ * A shade action is named after where it is and what it does — "Bedroom
+ * close", "Upstairs open" — so showing it on a lock screen tells a stranger
+ * holding the phone something about the house. The generic name costs the
+ * owner nothing, since they are one unlock away from the real one.
+ */
+internal fun tileLabel(actionLabel: String?, locked: Boolean): String =
+    if (locked || actionLabel.isNullOrBlank()) TILE_UNCONFIGURED_LABEL else actionLabel
+
+// --- Launcher shortcuts (build order step 11) ------------------------------
+
+/**
+ * How many actions get a launcher shortcut.
+ *
+ * Launchers commonly show four or five before scrolling, and the system's own
+ * cap is queried separately and applied on top of this — this is the number
+ * that keeps a long-press menu usable, not a platform limit.
+ */
+internal const val MAX_SHORTCUTS: Int = 4
+
+/**
+ * Which actions become shortcuts, in the order they should appear.
+ *
+ * Actions with no commands are dropped rather than shown: the editor already
+ * discards shades with nothing enabled, so a zero-command action is one that
+ * would connect to nothing and move nothing, and a launcher shortcut that
+ * does nothing is indistinguishable from a broken one.
+ *
+ * Alphabetical, because there is no usage data to rank by and an arbitrary
+ * order would shuffle under the user's thumb as actions are added.
+ */
+internal fun shortcutActions(actions: List<ShadeAction>, max: Int = MAX_SHORTCUTS): List<ShadeAction> =
+    actions
+        .filter { it.label.isNotBlank() && it.commands.isNotEmpty() }
+        .sortedBy { it.label.lowercase() }
+        .take(max.coerceAtLeast(0))
+
+/** Shown when a launcher shortcut starts an action; see `RunActionActivity`. */
+internal const val SHORTCUT_STARTED_TEXT: String = "Sending…"

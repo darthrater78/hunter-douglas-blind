@@ -10,6 +10,7 @@ import androidx.activity.viewModels
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.scrivtech.powerview.data.BatterySweepWorker
 import com.scrivtech.powerview.ui.ActionsViewModel
 import com.scrivtech.powerview.ui.PowerViewApp
 import com.scrivtech.powerview.ui.PowerViewTheme
@@ -43,7 +44,8 @@ public class MainActivity : ComponentActivity() {
     }
 
     private val settingsViewModel: SettingsViewModel by viewModels {
-        SettingsViewModel.Factory((application as PowerViewApplication).settingsStore)
+        val app = application as PowerViewApplication
+        SettingsViewModel.Factory(app.settingsStore) { BatterySweepWorker.sweepNow(app) }
     }
 
     private val requestBlePermissions = registerForActivityResult(
@@ -87,6 +89,8 @@ public class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by settingsViewModel.themeMode.collectAsState()
+            val tileActionId by settingsViewModel.tileActionId.collectAsState()
+            val sweepInterval by settingsViewModel.sweepInterval.collectAsState()
 
             PowerViewTheme(mode = themeMode) {
                 Surface {
@@ -95,6 +99,11 @@ public class MainActivity : ComponentActivity() {
                         actionsViewModel = actionsViewModel,
                         themeMode = themeMode,
                         onThemeModeChange = settingsViewModel::setThemeMode,
+                        tileActionId = tileActionId,
+                        onTileActionChange = settingsViewModel::setTileActionId,
+                        sweepInterval = sweepInterval,
+                        onSweepIntervalChange = settingsViewModel::setSweepInterval,
+                        onSweepNow = settingsViewModel::sweepNow,
                     )
                 }
             }

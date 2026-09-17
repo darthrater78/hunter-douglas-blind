@@ -55,6 +55,157 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
+- **The battery sweep interval is a setting.** Daily, every 3 days, weekly,
+  every 2 weeks, monthly, or off, under Settings → Battery checks. The
+  default is weekly, which is exactly what the sweep did before, so an
+  install that never touches this keeps the behaviour it had.
+
+  It was a hardcoded constant, and it should not have been: the right answer
+  depends on the home and the cost of being wrong runs both ways. Reading a
+  battery means connecting to the shade, which spends the power being
+  measured, so sweeping daily across a dozen shades is itself a drain — but a
+  month between sweeps lets a shade sit flat for a fortnight before anything
+  says so. The screen states that trade above the options rather than
+  offering a list of bare intervals, because the counter-intuitive half is
+  that checking more often is not free.
+
+  **Off is a real choice**, for a home that is mostly mains-powered or a user
+  who would rather read batteries by hand — so it comes with **Check now**,
+  which runs one sweep immediately. Without that, Off would mean "never see a
+  reading again", which is not a setting anyone wants.
+
+  A changed interval takes effect now, via
+  `ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE`: someone switching from
+  monthly to daily means "start sweeping daily", not "sweep daily once the
+  month is up". App start still uses `KEEP`, so the period is not restarted
+  on every launch — at a monthly interval that could stop it ever running on
+  a phone that gets opened daily.
+
+  **The battery widget's staleness threshold now follows the setting** — two
+  sweep periods, rather than a fixed fortnight. Pinned at 14 days it would
+  have marked everything permanently stale on a monthly sweep, and stayed
+  silent through a fortnight of failures on a daily one. With the sweep off
+  there is no period to double, so it falls back to a flat 30 days.
+
+### Changed
+- `SettingsStore`'s flows are `distinctUntilChanged`. All three settings share
+  one DataStore, so without it changing the theme re-emitted the sweep
+  interval and rescheduled the sweep — restarting its period every time
+  someone toggled dark mode.
+- The settings screen's two near-identical radio rows became one
+  `SettingOption`, now that there are three lists using it.
+
+- **A battery widget.** Every battery-powered shade on the home screen, worst
+  first, with a header saying how many are low or unread. Battery monitoring
+  is much of the point of this app; the weekly sweep and the low-battery
+  notification already existed, and this is the at-a-glance surface between
+  them — a notification only fires on a threshold crossing, and otherwise the
+  app has to be opened.
+
+  **It never connects to a shade.** Reading a battery means a full
+  connect/disconnect cycle, which spends the very thing being measured, so
+  the widget renders only what `ShadeStore` already holds. `updatePeriodMillis`
+  is 0 for a sharper reason than usual: a widget about battery life that woke
+  on a timer would spend battery life to learn nothing had changed. A tap
+  opens the app, where the per-shade "Read battery" button is the deliberate,
+  one-at-a-time way to spend that power.
+
+  Two things it refuses to imply. A shade that has never been read shows "Not
+  read yet", not 0% — and it does not count towards "low", because unknown is
+  not low. And a reading older than two sweep periods is shown with its age
+  attached, because a month-old number rendered as a bare percentage claims a
+  currency it does not have. Never-read shades sort above even the flattest
+  known one: they are the shades the sweep has not reached, so they are the
+  ones the app is least entitled to reassure anyone about.
+
+  Rows are capped with a counted overflow line rather than scrolled. Glance
+  has a lazy list, but this project pins Glance 1.1.1 and cannot compile
+  against it here to confirm which signature that version has — and with rows
+  sorted worst first, the ones that fit are the ones that matter. Hiding the
+  rest silently would make a monitoring widget lie by omission, so the count
+  is shown.
+
+  Redraws are pushed from `PowerViewApplication` watching `ShadeStore`, not by
+  the sweep directly: `BatterySweepWorker` lives in `:data`, which cannot see
+  `:widget`. The sweep runs in the app process, so the collector hears every
+  sweep result, rename, forget and manual read.
+
+  `BatteryLevel`, `batteryLevelOf` and `LOW_BATTERY_PERCENT` moved out of
+  `BatteryReader.kt` into their own file. They had no Android imports but
+  lived in a file that did, so the off-device harness had to keep a hand-made
+  copy of them — which is how a copy drifts and a test starts proving nothing.
+
+### Fixed
+- **`ActionShortcuts` was `internal`, so `:app` could not compile against it.**
+  `internal` is per Gradle module; the off-device harness compiles a single
+  module and therefore cannot catch this class of error at all. It is now
+  `public`, along with `refreshBatteryWidgets`, and `docs/HANDOFF.md` records
+  the check that finds it before CI does.
+
+- **Launcher shortcuts, completing build order step 11.** Long-press the app
+  icon to run a saved action without opening the app. Up to four, alphabetical
+  — there is no usage data to rank by, and an arbitrary order would shuffle
+  under the user's thumb as actions are added.
+
+  Republished whenever the action list changes rather than once at startup: a
+  shortcut is a *copy* of the label, so a renamed action would otherwise carry
+  its old name on the launcher until the next cold start. The shortcut id is
+  the action id, which is what keeps a pinned shortcut pointing at the right
+  action across that rename. The collector lives in `PowerViewApplication`
+  because it is the one collector that has to outlive every screen.
+
+  **`RunActionActivity` is not exported, and does not need to be.** The system
+  starts a shortcut's intent under the publishing app's identity, not the
+  launcher's — AOSP's `LauncherAppsService.startShortcutInner` states it in as
+  many words. So the trampoline has no untrusted-input surface at all.
+  Exporting it by reflex, which is the easy mistake here, would have let any
+  installed app move the shades.
+
+  Actions with no commands, or a blank label, get no shortcut: the editor can
+  produce a zero-command action, and a launcher shortcut that does nothing is
+  indistinguishable from a broken one. The cap is applied after that filter,
+  so empty actions sorting early cannot eat the slots of real ones.
+
+  A shortcut tap raises a "Sending…" toast — the only surface here with
+  nowhere of its own to report, so without it the tap is silent and
+  indistinguishable from one that did not work. "Sending" is the honest tense:
+  the outcome lands seconds later on the widget or tile if one exists, and in
+  the app either way.
+
+- **The Quick Settings tile (build order step 11).** One designated
+  `ShadeAction`, run through the same `CommandDispatch` call a widget tap
+  uses, so the tile is a second button on one funnel rather than a second
+  path to BLE.
+
+  **Which action it runs is chosen in the app's settings, not on the tile.** A
+  tile is one button with nowhere to put a picker, unlike a widget, which gets
+  a configuration activity when it is placed. The id is stored rather than the
+  action, so renaming or retargeting needs no reconfiguration — the same
+  contract widgets have.
+
+  **The last run's outcome is held in memory and deliberately not persisted.**
+  There is exactly one tile, so there is exactly one value, and it is worth
+  only as much as the process it was learned in: after the app has been
+  killed, "last run failed" is stale news the user cannot act on from a tile.
+  The app is the record, which is what the failure subtitle points at.
+
+  **It does nothing from the lock screen.** The spec asked for a lock-screen
+  control, and it is not wanted: this tile moves physical objects in someone's
+  home, and a phone on a table should not be a remote for them. A tap goes
+  through `unlockAndRun`, which demands the lock screen first and runs
+  straight through when the device is already unlocked, so the owner pays
+  nothing for it. A locked tile also shows a generic name and "Unlock to use"
+  instead of the action's label — an action is named for where it is and what
+  it does, which is not a stranger's to read off a lock screen.
+
+  Exported, like any tile, but bound behind `BIND_QUICK_SETTINGS_TILE` so only
+  the system can reach it.
+
+  `Tile.subtitle` is API 29, so it is guarded; below that the label carries
+  everything and nothing is lost. `startActivityAndCollapse` is branched on
+  API 34, where the `Intent` overload was replaced by a `PendingIntent` one
+  and now throws — the `PendingIntent` is `FLAG_IMMUTABLE`.
+
 - **The home-screen widget (build order step 9).** One to six buttons per
   widget, each running a saved `ShadeAction` through the same `ActionRunner`
   funnel as the in-app controls. `ShadeActionWidget` + its receiver,

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.scrivtech.powerview.data.SettingsStore
+import com.scrivtech.powerview.data.SweepInterval
 import com.scrivtech.powerview.data.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
  */
 public class SettingsViewModel(
     private val settingsStore: SettingsStore,
+    private val onSweepNow: () -> Unit,
 ) : ViewModel() {
 
     /**
@@ -39,13 +41,47 @@ public class SettingsViewModel(
         viewModelScope.launch { settingsStore.setThemeMode(mode) }
     }
 
+    /**
+     * Which action the Quick Settings tile runs, or null for none.
+     *
+     * `WhileSubscribed` unlike [themeMode]: nothing outside the settings
+     * screen reads this, so there is no wrong-value flash to avoid.
+     */
+    public val tileActionId: StateFlow<String?> = settingsStore.tileActionId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), null)
+
+    public fun setTileActionId(actionId: String?) {
+        viewModelScope.launch { settingsStore.setTileActionId(actionId) }
+    }
+
+    public val sweepInterval: StateFlow<SweepInterval> = settingsStore.sweepInterval
+        .stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
+            SweepInterval.DEFAULT,
+        )
+
+    public fun setSweepInterval(interval: SweepInterval) {
+        viewModelScope.launch { settingsStore.setSweepInterval(interval) }
+    }
+
+    /**
+     * Runs a sweep now. Enqueueing the work lives in `:data` and is passed in
+     * rather than reached for here: a view model that knew about WorkManager
+     * would be a view model that could not be reasoned about without it.
+     */
+    public fun sweepNow() {
+        onSweepNow()
+    }
+
     public class Factory(
         private val settingsStore: SettingsStore,
+        private val onSweepNow: () -> Unit,
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(SettingsViewModel::class.java))
-            return SettingsViewModel(settingsStore) as T
+            return SettingsViewModel(settingsStore, onSweepNow) as T
         }
     }
 }

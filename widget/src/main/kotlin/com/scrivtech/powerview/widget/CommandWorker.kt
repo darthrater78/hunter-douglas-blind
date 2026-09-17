@@ -20,9 +20,9 @@ import kotlinx.coroutines.flow.first
  * See [CommandDispatch] for why this is *not* expedited work, and what would
  * have to be declared before it could be.
  *
- * Reporting the outcome is part of the job, not an extra: a widget button
- * left showing "Sending…" forever is worse than one that says it failed, so
- * every terminal path here goes through [finish].
+ * Reporting the outcome is part of the job, not an extra: a widget button or
+ * a tile left showing "Sending…" forever is worse than one that says it
+ * failed, so every terminal path here goes through [finish].
  */
 public class CommandWorker(
     context: Context,
@@ -70,11 +70,14 @@ public class CommandWorker(
      * `ActionRunner` knows. The in-app screens carry that nuance in words.
      */
     private suspend fun finish(actionId: String, succeeded: Boolean, result: Result): Result {
-        WidgetStatus.mark(
-            context = applicationContext,
-            actionId = actionId,
-            run = if (succeeded) SlotRun.IDLE else SlotRun.FAILED,
-        )
+        val run = if (succeeded) SlotRun.IDLE else SlotRun.FAILED
+
+        // Every surface that can show this action, not just the one that
+        // started it: a tile tap and a widget tap run the same action, and
+        // whichever one the user looks at next should be telling the truth.
+        WidgetStatus.mark(context = applicationContext, actionId = actionId, run = run)
+        QuickSettingsTile.report(context = applicationContext, actionId = actionId, run = run)
+
         return result
     }
 

@@ -40,8 +40,8 @@ colours yet.
 :ui         Android/Compose — shade list, per-shade detail, actions list/editor,
             settings (theme), and the build-order-step-2 debug screen as one route
 :widget     Android — home-screen command surfaces: the Glance widget, its
-            configuration activity and CommandWorker. The Quick Settings tile is
-            still a TODO stub (build order step 11)
+            configuration activity, the battery widget, the Quick Settings tile,
+            launcher shortcuts and CommandWorker
 :app        Android application — manifest/permissions, MainActivity, DI wiring
 ```
 
@@ -60,8 +60,8 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 7. ✅ Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command`, plus the shade list, room grouping and the naming/detail screen.)
 8. ✅ `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Per-rail sliders on the shade detail screen call `ActionRunner` directly. Nothing can succeed until step 5 supplies a keystream — the controls say so rather than failing opaquely.)
 9. ✅ Glance widgets: 1×1 and the grid, with a configuration activity and pending/failed states. (`ShadeActionWidget` + `ShadeActionWidgetReceiver`, `WidgetConfigActivity`, `WidgetStatus`, `CommandDispatch`. State is per widget *instance*, so two widgets pointing at the same action do not share a spinner. Not expedited work — see `CommandDispatch` for why that would crash below API 31.)
-10. ✅ Battery sweep worker and low-battery notifications. (`BatterySweepWorker`, weekly, skips mains-powered shades; `BatteryNotifier` posts one summary notification at or below `LOW_BATTERY_PERCENT`.)
-11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`. `CommandDispatch` is the call it needs; the widget already uses it.)
+10. ✅ Battery sweep worker, low-battery notifications **and a battery widget**. (`BatterySweepWorker`, on a user-chosen interval — daily to monthly, or off, defaulting to weekly — skipping mains-powered shades; `BatteryNotifier` posts one summary notification at or below `LOW_BATTERY_PERCENT`. `BatteryWidget` is the at-a-glance surface between the two: every battery-powered shade, worst first, never connecting to anything itself.)
+11. ✅ Quick Settings tile and launcher shortcuts. (`QuickSettingsTile` runs one designated action, chosen in the app's settings because a tile has one button and nowhere to put a picker; it does nothing from the lock screen — see "Security notes". `ActionShortcuts` publishes up to four dynamic shortcuts, republished whenever the action list changes, into the non-exported `RunActionActivity` trampoline.)
 12. Optional: Home Assistant bridge via a Python port of `:protocol` + `bleak` + an ESPHome BLE proxy.
 
 ## Verifying `:protocol`
@@ -156,6 +156,26 @@ Generate a keystore with `keytool -genkeypair -keystore release.keystore
 the keystore — `.gitignore` already covers `*.keystore`/`*.jks`.
 
 ## Security notes
+
+**The Quick Settings tile does nothing from the lock screen, deliberately.**
+The spec asked for a lock-screen control; it is not wanted, and this tile
+moves physical objects in someone's home — a phone left on a table should not
+be a remote for the blinds. Two things follow. A tap goes through
+`unlockAndRun`, so Android demands the lock screen before anything is sent
+(and runs straight through when the device is already unlocked, so it costs
+the owner nothing). And a locked tile shows a generic name and "Unlock to
+use" rather than the action's own label: an action is named for where it is
+and what it does — "Bedroom close" — which is not a stranger's to read off a
+lock screen.
+
+**Launcher shortcuts run through a deliberately non-exported activity.** A
+shortcut's intent is started by the system under the *publishing* app's
+identity rather than the launcher's — AOSP's
+`LauncherAppsService.startShortcutInner` says so outright ("Note the target
+activity doesn't have to be exported") — so `RunActionActivity` needs no
+export and has no untrusted-input surface. Exporting it, which is easy to do
+by reflex, would have let any installed app move the shades by firing an
+intent at it.
 
 - The write keystream (spec §1.4/§4) is stored via `EncryptedSharedPreferences`
   (Android Keystore-backed), separate from the plain shade metadata blob —

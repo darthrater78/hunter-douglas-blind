@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.scrivtech.powerview.data.SweepInterval
 import com.scrivtech.powerview.data.ThemeMode
 
 private const val ROUTE_SHADES = "shades"
@@ -45,6 +46,11 @@ public fun PowerViewApp(
     actionsViewModel: ActionsViewModel,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    tileActionId: String?,
+    onTileActionChange: (String?) -> Unit,
+    sweepInterval: SweepInterval,
+    onSweepIntervalChange: (SweepInterval) -> Unit,
+    onSweepNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var route by rememberSaveable { mutableStateOf(ROUTE_SHADES) }
@@ -160,6 +166,12 @@ public fun PowerViewApp(
             ROUTE_SETTINGS -> SettingsScreen(
                 themeMode = themeMode,
                 onThemeModeChange = onThemeModeChange,
+                actions = actions,
+                tileActionId = tileActionId,
+                onTileActionChange = onTileActionChange,
+                sweepInterval = sweepInterval,
+                onSweepIntervalChange = onSweepIntervalChange,
+                onSweepNow = onSweepNow,
                 modifier = content,
             )
 

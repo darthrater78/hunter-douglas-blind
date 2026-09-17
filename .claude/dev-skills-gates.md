@@ -1,13 +1,13 @@
 # Dev Skills gate state
 Track: work commits (no version bump, no artifact publish, no release)
 Version: n/a — still pre-release, nothing tagged
-Updated: 2026-09-17 (session 2)
+Updated: 2026-09-17 (end of session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ CI green through `0113457`; theme + widget commits pending CI
-🔒 SECURITY   ✅ theme + widget diffs scanned, 0 Critical / 0 High — see notes
+🔨 BUILD      ✅ green at branch head `05af903` (run #24, incl. R8)
+🔒 SECURITY   ✅ every session-2 diff scanned, 0 Critical / 0 High — see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
-📦 RELEASE    ⬜ no PR open
+📦 RELEASE    ⬜ no PR open for this branch; 7 Dependabot PRs target it
 🚀 SHIP       ⬜ nothing tagged or released
 
 Environment: remote container (git executed by Claude after approval; tag
@@ -22,27 +22,64 @@ how to verify pure-Kotlin code locally without an Android SDK, and what is
 blocked rather than skipped.
 
 ## Build gate notes
-**Resolved: the battery sweep compiles.** CI run #14 on `0113457` — the branch
-head, carrying the same sweep code as `3fe7a27` — finished green, through
-`assembleRelease` with R8. The previous session's open question is closed; no
-commit on this branch is now unverified by a compiler.
+**Green at the branch head `05af903`** (run #24), including
+`assembleRelease` with R8. Every commit on this branch has been seen by a
+compiler.
 
-Everything from `9e7760c` onward is green.
+Session 2 runs: #17 theme ✅, #18 Glance widget ✅, #20 tile ✅, #21 lock
+screen ✅, **#22 shortcuts ❌**, #23 battery widget + fix ✅, #24 sweep
+setting ✅.
+
+**Run #22 is the one real failure and it is fixed, not worked around.**
+`ActionShortcuts` was `internal` and `:app` calls it; `internal` is per
+Gradle module. The off-device harness compiles a single module, where
+`internal` always resolves, so it cannot catch this by construction — the
+grep that does is in `docs/HANDOFF.md` under "Verifying work without an
+Android SDK", and it must be run before any push that adds an `:app`
+reference into another module.
+
+**What made the blind Glance commit compile first try** is worth repeating:
+every Glance signature was read from the AndroidX sources on GitHub
+(`raw.githubusercontent.com/androidx/androidx/androidx-main/glance/...`, which
+is reachable here even though Google Maven is not) rather than recalled. One
+fetch per signature beats one CI round trip per guess.
 
 The Android modules still cannot be compiled in this container (no SDK; Google
 Maven unreachable). What *can* be checked locally has grown, and is worth using:
 any file with no Android imports compiles and tests in an isolated
 Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
-compile error before CI this session.
+compile error before CI this session — but see run #22 above for what it
+cannot catch, and the androidx-main-versus-pinned-version trap recorded
+alongside it.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 42 in `:ui`, 17 in `:widget`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 47 in `:ui`, 50 in `:widget`.
 
 ## Security gate notes
 **This session's work is scanned and clean** (0 Critical / 0 High).
 
-The widget (step 9) adds **two exported components**, which is the one thing
-here worth a reviewer's attention. Both have to be exported — a widget
+The widget (step 9) and tile (step 11) add **three exported components**,
+which is the thing here most worth a reviewer's attention.
+
+Launcher shortcuts add a fourth component, `RunActionActivity`, and it is
+**not** exported — verified against AOSP rather than assumed. The system
+starts a shortcut's intent under the publishing app's identity, not the
+launcher's (`LauncherAppsService.startShortcutInner`: "Note the target
+activity doesn't have to be exported"), so the trampoline is reachable that
+way and no other. Exporting it by reflex would have let any installed app
+move the shades by firing an intent with an action id.
+
+The tile's `<service>` is bound behind `android.permission.BIND_QUICK_SETTINGS_TILE`,
+so only the system can reach it despite being exported. Its `PendingIntent`
+(the API 34+ `startActivityAndCollapse` path) is `FLAG_IMMUTABLE`.
+
+**Closed: the tile no longer works from the lock screen.** It was built to
+the spec's lock-screen requirement, the user said they did not want one, and
+it now goes through `unlockAndRun` — so nothing is sent until the device is
+unlocked. A locked tile also withholds the action's label and its last
+result, since an action is named for a room and a thing done to it.
+
+The two widget components: Both have to be exported — a widget
 receiver that is not exported never receives `APPWIDGET_UPDATE`, and the
 launcher is what starts a configuration activity — so the question is what
 they accept. The receiver acts only on widget ids the system hands it. The
@@ -103,5 +140,14 @@ one. CI uploads a debug-signed APK on every push, and it is now worth installing
 — the app has a real UI, and everything except moving a shade works.
 
 ## Note for the next session
-Commit approval does not carry across sessions. A standing approval granted in
-this one means nothing in the next — ask again.
+Commit approval does not carry across sessions. Session 2 was granted a
+standing approval for its work commits; that expired with the session. **Ask
+again.**
+
+**Start with the Dependabot queue.** Seven PRs are open against this branch
+and were listed but not read. `docs/HANDOFF.md` has the table, a suggested
+order and the reasoning — PR #5 (security-crypto alpha → stable) is the
+highest-value one, and #3/#4 (Gradle 9 + AGP 9) are coupled and must go
+together. Per dev-skills §4.1 each major is its own change with its own
+gates. None of them can be validated locally: Google Maven is unreachable
+from the container, so CI is the only judge.
