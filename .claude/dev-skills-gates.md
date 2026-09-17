@@ -1,13 +1,13 @@
 # Dev Skills gate state
 Track: work commits (no version bump, no artifact publish, no release)
 Version: n/a — still pre-release, nothing tagged
-Updated: 2026-09-17 (session 2)
+Updated: 2026-09-17 (end of session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ green again at `73a4906` (run #23); sweep setting pending CI
-🔒 SECURITY   ✅ theme/widget/tile diffs scanned, 0 Critical / 0 High — see notes
+🔨 BUILD      ✅ green at branch head `05af903` (run #24, incl. R8)
+🔒 SECURITY   ✅ every session-2 diff scanned, 0 Critical / 0 High — see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
-📦 RELEASE    ⬜ no PR open
+📦 RELEASE    ⬜ no PR open for this branch; 7 Dependabot PRs target it
 🚀 SHIP       ⬜ nothing tagged or released
 
 Environment: remote container (git executed by Claude after approval; tag
@@ -22,14 +22,21 @@ how to verify pure-Kotlin code locally without an Android SDK, and what is
 blocked rather than skipped.
 
 ## Build gate notes
-**Green through `7add46c`** (run #21), including `assembleRelease` with R8 on
-every commit. That covers the theme picker (#17), the whole Glance widget
-(#18), the Quick Settings tile (#20) and the lock-screen change (#21) — all
-written without an Android SDK to compile against, and none of them red.
+**Green at the branch head `05af903`** (run #24), including
+`assembleRelease` with R8. Every commit on this branch has been seen by a
+compiler.
 
-The previous session's open question is closed too: run #14 on `0113457`
-carried the same battery-sweep code as `3fe7a27` and passed, so no commit on
-this branch is unverified by a compiler.
+Session 2 runs: #17 theme ✅, #18 Glance widget ✅, #20 tile ✅, #21 lock
+screen ✅, **#22 shortcuts ❌**, #23 battery widget + fix ✅, #24 sweep
+setting ✅.
+
+**Run #22 is the one real failure and it is fixed, not worked around.**
+`ActionShortcuts` was `internal` and `:app` calls it; `internal` is per
+Gradle module. The off-device harness compiles a single module, where
+`internal` always resolves, so it cannot catch this by construction — the
+grep that does is in `docs/HANDOFF.md` under "Verifying work without an
+Android SDK", and it must be run before any push that adds an `:app`
+reference into another module.
 
 **What made the blind Glance commit compile first try** is worth repeating:
 every Glance signature was read from the AndroidX sources on GitHub
@@ -42,7 +49,9 @@ Maven unreachable). What *can* be checked locally has grown, and is worth using:
 any file with no Android imports compiles and tests in an isolated
 Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
-compile error before CI this session.
+compile error before CI this session — but see run #22 above for what it
+cannot catch, and the androidx-main-versus-pinned-version trap recorded
+alongside it.
 
 Test counts: 40 in `:protocol`, 4 in `:data`, 47 in `:ui`, 50 in `:widget`.
 
@@ -131,5 +140,14 @@ one. CI uploads a debug-signed APK on every push, and it is now worth installing
 — the app has a real UI, and everything except moving a shade works.
 
 ## Note for the next session
-Commit approval does not carry across sessions. A standing approval granted in
-this one means nothing in the next — ask again.
+Commit approval does not carry across sessions. Session 2 was granted a
+standing approval for its work commits; that expired with the session. **Ask
+again.**
+
+**Start with the Dependabot queue.** Seven PRs are open against this branch
+and were listed but not read. `docs/HANDOFF.md` has the table, a suggested
+order and the reasoning — PR #5 (security-crypto alpha → stable) is the
+highest-value one, and #3/#4 (Gradle 9 + AGP 9) are coupled and must go
+together. Per dev-skills §4.1 each major is its own change with its own
+gates. None of them can be validated locally: Google Maven is unreachable
+from the container, so CI is the only judge.

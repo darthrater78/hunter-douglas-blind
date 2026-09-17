@@ -1,7 +1,10 @@
 # Handoff
 
-Written 2026-09-17, updated the same day in a second session. Branch
-`claude/load-dev-skills-d0bioe` — not merged, no PR open, no release tagged.
+Written 2026-09-17, rewritten the same day at the end of a second session.
+Branch `claude/load-dev-skills-d0bioe` at `05af903`, green in CI (run #24)
+— not merged, no PR open for it, no release tagged. Seven Dependabot PRs are
+open against it and are the first thing to deal with; see "The Dependabot
+queue" below.
 
 This is the state-of-play document for whoever picks the project up next. The
 README describes what the app is meant to be; this describes what is actually
@@ -27,6 +30,10 @@ it forward; steps 9 and 11 are built around it, and step 6 is really part of
 onboarding anyway. The UI is built to say so
 out loud rather than failing opaquely — see "The no-keystream state" below.
 
+**Two things are waiting, in this order.** Seven Dependabot PRs are open
+against this branch and were reviewed only as a list, not read — that section
+is below and is the first thing to pick up. Then step 5.
+
 Build order progress (numbering follows the README):
 
 | Step | State |
@@ -36,7 +43,7 @@ Build order progress (numbering follows the README):
 | 3 Capability mapping + per-shade UI | ✅ detail screen offers only what a capability claims |
 | 4 GATT connect + battery read | ✅ **first real GATT connection worked** |
 | 5 Keystream import + first write | ⬜ **the only thing blocking real control** |
-| 6 Derive-from-capture, tilt, secondary | ⬜ core classes exist, no UI |
+| 6 Derive-from-capture, tilt, secondary | ◐ tilt/secondary/queue done; the capture UI *is* step 5 |
 | 7 Persistence, labels/rooms, actions | ✅ shade list, rooms, naming, action editor |
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
 | 9 Glance widgets | ✅ widget, grid, config activity, per-instance state |
@@ -44,55 +51,108 @@ Build order progress (numbering follows the README):
 | 11 Quick Settings tile + shortcuts | ✅ tile, and four dynamic shortcuts |
 | 12 Home Assistant bridge | ⬜ optional |
 
-Appearance is not a build-order step. A theme picker (Follow system / Light /
-Dark / Black (OLED)) landed in the second session; see the CHANGELOG entry for
-why the OLED scheme's containers are not themselves black.
+Two things that are not build-order steps landed in the second session and
+are easy to miss in that table: a **theme picker** (Follow system / Light /
+Dark / Black (OLED)) and a **battery widget** with a **configurable sweep
+interval**. The CHANGELOG carries the design reasoning for each — why the
+OLED scheme's containers are deliberately not black, and why the battery
+widget never connects to a shade.
 
 ---
 
 ## What changed in the second session
 
-**Step 9 (the Glance widget) and most of step 11 (the Quick Settings tile).**
-Both were written blind and both compiled first try, including through R8.
+Six commits, all green in CI except one that was red for eleven minutes and
+is described below because the reason is worth knowing.
 
-**The Quick Settings tile.** One designated action, run through the widget's
-`CommandDispatch`. Its action is chosen in the app's settings because a tile
-has nowhere to put a picker, and its last-run state is in memory on purpose —
-there is one tile, so one value, and after a process death "last run failed"
-is stale news nobody can act on from a tile. It is reachable from the lock
-screen by design: a tap goes through `unlockAndRun` and a locked tile shows
-neither the action's name nor its last result. The spec asked for a
-lock-screen control and the user did not want one — if that ever reverses,
-the whole of it is `onClick` and the `locked` branch in `tileLabel` /
-`tileSubtitle`.
+1. **A theme picker with an OLED black option** (`161b57c`) — not a
+   build-order step, asked for directly. `SettingsStore`/`ThemeMode` in
+   `:data`, `PowerViewTheme` and a settings screen in `:ui`, and the shades
+   app bar's two text buttons collapsed into a `More` overflow to make room
+   for a third destination.
+2. **Step 9, the Glance widget** (`9193ad2`) — one to six buttons per widget
+   instance, a configuration activity, and results written back to every
+   widget showing the action.
+3. **Step 11, the Quick Settings tile** (`14a31ae`).
+4. **The tile stopped working from the lock screen** (`7add46c`), at the
+   user's request — see below.
+5. **A battery widget, and the fix for the red build** (`73a4906`).
+6. **The battery sweep interval became a setting** (`05af903`).
 
-**Step 9, the Glance widget.** One to six buttons per widget instance, a
-configuration activity to choose which saved actions they run, and results
-written back to every widget showing the action. Three things in it are worth
-knowing before touching it, all recorded in the CHANGELOG entry: it is
-deliberately *not* expedited WorkManager work (that crashes below API 31 at
-this project's `minSdk`), tap debounce is three layers deep because a
-duplicate tap costs shade battery, and a success clears the button rather than
-showing a tick, since the widget knows a frame was acknowledged and not that
-anything moved.
+### The red build, and what it says about the local harness
 
-Verifying it was the interesting part. The container has no Android SDK and no
-Glance to compile against, so every Glance call was checked against the
-AndroidX sources on GitHub before being written — which settled, among others,
-that `provideContent` is a top-level extension needing an import while
-`update` is a member needing none, and caught that a leading-dot class name in
-a *library* manifest resolves against the app's `applicationId` rather than
-the module's namespace, so the receiver and config activity are named in full.
-Everything that could be pulled out of Glance's way lives in
-`WidgetPresentation.kt` and is tested off-device.
+`e10c16b` (launcher shortcuts) failed CI. `ActionShortcuts` was declared
+`internal` and `PowerViewApplication` calls it — and `internal` is per Gradle
+module, so `:app` could not see it. Thirty-eight tests had passed locally
+against code that compiled nowhere.
 
-**A theme picker with an OLED black option** — not a build-order step, asked for
-directly. `SettingsStore`/`ThemeMode` in `:data`, `PowerViewTheme` plus a
-settings screen in `:ui`, and the shades app bar's two text buttons collapsed
-into a `More` overflow to make room for a third destination. The design
-reasoning (why the OLED containers are not themselves black, why `surfaceTint`
-has to be black, why OLED ignores the system setting) is in the CHANGELOG
-entry rather than repeated here.
+**This is a class of error the off-device harness cannot catch by
+construction**, because it compiles files inside a single module where
+`internal` always resolves. The remedy is in "Verifying work without an
+Android SDK" below: a grep that checks every `:app` reference into another
+module is `public`. Run it before any push that adds one.
+
+### The battery work, which is most of what this app is for
+
+The weekly sweep and the low-battery notification already existed and had
+nothing between them: a notification fires only on a threshold crossing, and
+otherwise the app had to be opened. So:
+
+- **`BatteryWidget`** lists every battery-powered shade, worst first, with a
+  header counting the low and the unread. It **never connects to a shade** —
+  reading a battery spends the power being measured, so it renders only what
+  `ShadeStore` holds, and a tap opens the app where the per-shade "Read
+  battery" button is the deliberate way to spend that power.
+- Two things it refuses to imply, both tested: a never-read shade shows "Not
+  read yet" rather than 0% and does **not** count as low, because unknown is
+  not low; and a reading older than two sweep periods carries its age rather
+  than posing as current. Never-read shades sort above even the flattest
+  known one.
+- **The sweep interval is a setting** — daily to monthly, or off, defaulting
+  to weekly so an existing install is unchanged. Off comes with a "Check now"
+  button, because otherwise Off means "never see a reading again". A change
+  takes effect immediately (`CANCEL_AND_REENQUEUE`); app start still uses
+  `KEEP` so the period is not restarted on every launch.
+- The widget's staleness threshold **follows that setting** (two periods)
+  rather than a fixed fortnight, which would mark everything permanently
+  stale on a monthly sweep and stay silent through a fortnight of failures on
+  a daily one.
+
+One latent bug was caught here and is worth remembering: all three settings
+share one DataStore, so without `distinctUntilChanged` **changing the theme
+re-emitted the sweep interval and rescheduled the sweep**, restarting its
+period every time someone toggled dark mode — which could have stopped sweeps
+firing at all. Nothing in testing would have shown that.
+
+### The command surfaces, and the one funnel under them
+
+There are now four ways to run a `ShadeAction`: the in-app sliders, the
+Glance widget, the Quick Settings tile and a launcher shortcut. All four go
+through `CommandDispatch` → `CommandWorker` → `ActionRunner`, so none of them
+owns BLE code and a change to command behaviour lands everywhere at once.
+
+Things in there that look like details and are not:
+
+- **Not expedited `WorkManager` work.** Below API 31 an expedited request is
+  satisfied by promoting the worker to a foreground service, which needs
+  `getForegroundInfo()` — whose default throws — plus two
+  `FOREGROUND_SERVICE*` permissions and a declared service. At `minSdk = 26`
+  that is a crash on Android 8–11, not a degraded experience.
+- **Tap debounce is three layers deep** (composition, stored state,
+  `ExistingWorkPolicy.KEEP` on a per-action unique name) because a duplicate
+  tap costs a connect/disconnect cycle on the *shade's* battery.
+- **Success clears a widget button rather than showing a tick.** The widget
+  knows a frame was acknowledged, not that a shade moved.
+- **The tile does nothing from the lock screen**, and a locked tile shows
+  neither the action's name nor its last result — an action is named for a
+  room and a thing done to it. The spec asked for a lock-screen control; the
+  user did not want one. To reverse it: `onClick`, plus the `locked` branch
+  in `tileLabel`/`tileSubtitle`.
+- **`RunActionActivity` is not exported**, verified against AOSP rather than
+  assumed: the system starts a shortcut's intent under the *publishing* app's
+  identity (`LauncherAppsService.startShortcutInner` — "Note the target
+  activity doesn't have to be exported"). Exporting it, the easy reflex,
+  would let any installed app move the shades.
 
 ## What changed in the first session
 
@@ -208,7 +268,58 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## Next step: step 5 — everything else is done
+## The Dependabot queue — deal with this first
+
+**Seven Dependabot PRs are open, and every one targets this feature branch**
+rather than the default branch, because that is where Dependabot was pointed.
+They were opened before most of this session's commits, so their bases are
+stale and some will conflict.
+
+They were listed but **not read** at the end of the session — the diffs and
+their CI results are unexamined, so treat the grouping below as a plan, not a
+verdict.
+
+| PR | Bump | Kind |
+|---|---|---|
+| #1 | `minor-and-patch` group, 5 updates (gradle) | minor/patch |
+| #8 | `actions` group, 3 updates (github_actions) | CI action SHAs |
+| #5 | `androidx.security:security-crypto` 1.1.0-alpha06 → **1.1.0** | alpha → stable |
+| #6 | `androidx.compose:compose-bom` 2024.12.01 → **2026.09.00** | ~2 years |
+| #2 | `org.junit.jupiter:junit-jupiter` 5.11.4 → **6.1.3** | major |
+| #3 | `gradle-wrapper` 8.14.3 → **9.7.1** | major |
+| #4 | `agp` 8.7.3 → **9.4.0** | major |
+
+Suggested order, and why:
+
+1. **#5 first.** It is the one flagged in "Blocked, not skipped" below: the
+   alpha guards the only credential in the app, and step 5 is about to put a
+   real keystream behind it. An alpha → stable release on the same version
+   line is the cheapest possible fix for a real concern.
+2. **#1 and #8.** Low risk by definition, and #1 clears a pile of
+   `UNVERIFIED` markers in `gradle/libs.versions.toml`.
+3. **#6 on its own.** "compose-bom" understates it: nearly two years of
+   Material 3. The OLED theme leans on the `surfaceContainer` roles and
+   `surfaceTint`, so this is the change most likely to alter how the app
+   *looks* rather than whether it builds. Give it its own commit and its own
+   look at a debug APK.
+4. **#3 and #4 together, and last.** Gradle 9 and AGP 9 are coupled — AGP
+   8.7.3 will not run on Gradle 9 — so merging either alone breaks the build.
+   Expect `compileSdk`/`targetSdk` to move with them. This is a real piece of
+   work, not a version bump, and the README already flags `targetSdk 35` as
+   likely at or below the Play Store floor by now.
+5. **#2** is a major (JUnit 6) and affects only `:protocol`'s test
+   dependency. Harmless to defer, harmless to take early; it just needs its
+   own gate rather than riding along with something else.
+
+Two things to keep in mind while working through them. `dev-skills` §4.1 is
+explicit that a major-version bump is its own change with its own gates and
+is never folded silently into an unrelated PR. And **nothing here can be
+resolved locally** — Google Maven is unreachable from the container, so CI is
+the only thing that can tell you whether a bump works.
+
+---
+
+## Next step after that: step 5 — everything else is done
 
 **Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
 that when this session offered to start it. An earlier version of this
@@ -321,12 +432,24 @@ Android imports so it can be checked this way.** That is why `groupIntoRooms`
 and the outcome-wording functions live in `ShadeFormatting.kt` rather than
 inside the Compose files that use them.
 
-Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
-(`ActionResultTest`), 44 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
-`ThemeSelectionTest` 7, `TileActionDescriptionTest` 2), 20 in `:widget`
-(`WidgetPresentationTest` 17, `TilePresentationTest` 6, `ShortcutActionsTest` 6,
-`BatteryWidgetPresentationTest` 11, `BatteryRowsToShowTest` 6,
-`StaleAfterDaysTest` 4).
+Test counts as of this commit, by annotated test method:
+
+| Module | Methods | Files |
+|---|---|---|
+| `:protocol` | 20 | 18 `@Test` + 2 `@ParameterizedTest` |
+| `:data` | 4 | `ActionResultTest` |
+| `:ui` | 47 | `ShadeFormattingTest`, `ActionDraftTest`, `ThemeSelectionTest` |
+| `:widget` | 50 | `WidgetPresentationTest`, `BatteryWidgetPresentationTest` |
+
+Earlier versions of this document said "40 in `:protocol`". That is the
+*executed case* count CI reports — the two parameterised tests expand — not
+the method count, and it cannot be checked from the container because
+`:protocol:test` fails at the root plugin block before it reaches the module.
+Both numbers are right about different things; this table counts methods,
+which is the one you can verify here with `grep -c '@Test'`.
+
+Of those, 62 run in the off-device harness (everything in `:ui` and
+`:widget` that has no Android imports, plus the `:data` pure files).
 
 Also verifiable locally: workflow files with `actionlint`.
 
@@ -336,15 +459,23 @@ Also verifiable locally: workflow files with `actionlint`.
 
 ## CI status
 
-**Green on the branch head.** Run #14 on `0113457` passed, including
-`assembleRelease` with R8, which is where `lintVitalRelease` runs. That run
-also settles the previous session's open question: `0113457` carries the same
-battery-sweep code as `3fe7a27`, so the sweep compiles and no commit on this
-branch is now unverified by a compiler.
+**Green on the branch head**, `05af903`, run #24 — including
+`assembleRelease` with R8, which is where `lintVitalRelease` runs. Every
+commit on this branch has now been seen by a compiler.
 
-The two `cancelled` runs in the history (`3fe7a27`, `e0d459b`) are not
-failures. CI sets `cancel-in-progress: true` on a per-ref concurrency group, so
-each was killed by the push that followed it.
+Runs this session: #17 theme ✅, #18 widget ✅, #20 tile ✅, #21 lock screen
+✅, **#22 shortcuts ❌**, #23 battery widget + fix ✅, #24 sweep setting ✅.
+
+Run #22 is the only genuine failure in the branch's history and it is fixed,
+not papered over: `ActionShortcuts` was `internal` where `:app` needed it
+public. See "The red build" above for why the local harness could not have
+caught it.
+
+The `cancelled` runs (`3fe7a27`, `e0d459b`, and any run whose push was
+quickly followed by another) are **not** failures. CI sets
+`cancel-in-progress: true` on a per-ref concurrency group, so a run dies when
+the next push starts. If you push twice in quick succession, read the *later*
+run.
 
 ```
 https://github.com/darthrater78/hunter-douglas-blind/actions
@@ -358,17 +489,19 @@ These were identified in the audit and cannot be completed from the sandbox:
   generated from a successful dependency resolution, which needs Google Maven.
   Worth doing from a normal dev machine — it is the only way to get a lockfile
   to audit against.
-- **Currency of the pinned versions.** `gradle/libs.versions.toml` marks AGP and
-  the AndroidX entries `UNVERIFIED`. CI has built green with them, so they
-  demonstrably *exist and work*; what is unknown is whether they are *current*.
-  AGP 8.7.3 and `compileSdk`/`targetSdk` 35 are the ones to look at hardest, and
-  targetSdk 35 may be at or below the Play Store's floor by now. Dependabot is
-  configured for both ecosystems and can run.
+- **Currency of the pinned versions — now answered, and waiting in PRs.**
+  `gradle/libs.versions.toml` still marks AGP and the AndroidX entries
+  `UNVERIFIED`, meaning "known to work, not known to be current". Dependabot
+  has since said what *is* current, so the open question has become a queue
+  of seven PRs rather than an unknown. Delete each `UNVERIFIED` marker as its
+  bump lands. See "The Dependabot queue" above.
 - **`androidx.security:security-crypto` is at `1.1.0-alpha06`**, and it guards
   the only credential in the app. Jetpack has been steering away from
-  `EncryptedSharedPreferences`. Make a deliberate decision before any real
-  release rather than carrying an alpha forward by default. This gets more
-  pressing the moment step 5 puts a real keystream in there.
+  `EncryptedSharedPreferences`. **PR #5 bumps it to a stable 1.1.0** and is
+  the single highest-value item in the queue — this gets more pressing the
+  moment step 5 puts a real keystream behind it. A stable release does not
+  settle the larger question of whether `EncryptedSharedPreferences` is the
+  right home for the keystream at all; make that call before a real release.
 - **`navigation-compose` is in the version catalog but referenced by no module**,
   so its pin has never been resolved by any build. Screen state is currently a
   saved route string plus a MAC in `PowerViewApp` — deliberate, and less code
@@ -423,7 +556,9 @@ reflective factory instead of being added to `CommandWorker.Factory`.
 - `.claude/dev-skills-gates.md` holds gate state and survives the container
   because it is committed. Read it before any git write.
 - Commit approval does not carry across sessions. A standing approval granted in
-  one session means nothing in the next.
+  one session means nothing in the next. The second session was given one
+  ("continue the automatic commit for this work since there's so many steps")
+  and it expired with it — **ask again**.
 - Tag pushes and ref deletions are always handed to the user to run, never
   executed directly.
 - Commit messages in this repo explain *why*, at length, and record what was
