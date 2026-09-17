@@ -51,6 +51,9 @@ public fun PowerViewApp(
     sweepInterval: SweepInterval,
     onSweepIntervalChange: (SweepInterval) -> Unit,
     onSweepNow: () -> Unit,
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
+    onOpenSystemNotificationSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var route by rememberSaveable { mutableStateOf(ROUTE_SHADES) }
@@ -172,6 +175,9 @@ public fun PowerViewApp(
                 sweepInterval = sweepInterval,
                 onSweepIntervalChange = onSweepIntervalChange,
                 onSweepNow = onSweepNow,
+                notificationsEnabled = notificationsEnabled,
+                onNotificationsEnabledChange = onNotificationsEnabledChange,
+                onOpenSystemNotificationSettings = onOpenSystemNotificationSettings,
                 modifier = content,
             )
 

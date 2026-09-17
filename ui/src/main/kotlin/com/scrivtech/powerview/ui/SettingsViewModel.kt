@@ -65,6 +65,13 @@ public class SettingsViewModel(
         viewModelScope.launch { settingsStore.setSweepInterval(interval) }
     }
 
+    public val notificationsEnabled: StateFlow<Boolean> = settingsStore.notificationsEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), true)
+
+    public fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setNotificationsEnabled(enabled) }
+    }
+
     /**
      * Runs a sweep now. Enqueueing the work lives in `:data` and is passed in
      * rather than reached for here: a view model that knew about WorkManager

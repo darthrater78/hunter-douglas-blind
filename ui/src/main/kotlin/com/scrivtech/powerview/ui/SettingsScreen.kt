@@ -14,7 +14,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -45,6 +47,9 @@ public fun SettingsScreen(
     sweepInterval: SweepInterval,
     onSweepIntervalChange: (SweepInterval) -> Unit,
     onSweepNow: () -> Unit,
+    notificationsEnabled: Boolean,
+    onNotificationsEnabledChange: (Boolean) -> Unit,
+    onOpenSystemNotificationSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -106,6 +111,47 @@ public fun SettingsScreen(
             // The escape hatch that makes Off a real choice rather than a way
             // to never see a reading again.
             Button(onClick = onSweepNow) { Text("Check now") }
+        }
+
+        item(key = "notifications-header") {
+            Text(
+                "Notifications",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+
+        item(key = "notifications-toggle") {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Column(modifier = Modifier.padding(end = 12.dp)) {
+                        Text("Low battery alerts", style = MaterialTheme.typography.bodyLarge)
+                        // Sweeps keep running and the widget keeps updating
+                        // either way; this only silences the notification
+                        // itself. Turning sweeps off in "Battery checks"
+                        // above is the bigger switch.
+                        Text(
+                            "A notification when a sweep finds a low battery. Readings still " +
+                                "happen and still show in the app with this off.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsEnabledChange)
+                }
+            }
+        }
+
+        item(key = "notifications-system-settings") {
+            // Sound, vibration and importance for the one channel this app
+            // has live in the system settings, not here.
+            TextButton(onClick = onOpenSystemNotificationSettings) {
+                Text("Open system notification settings")
+            }
         }
 
         item(key = "tile-header") {

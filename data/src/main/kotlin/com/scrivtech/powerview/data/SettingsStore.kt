@@ -3,6 +3,7 @@ package com.scrivtech.powerview.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -25,6 +26,7 @@ public class SettingsStore(private val context: Context) {
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val tileActionIdKey = stringPreferencesKey("tile_action_id")
     private val sweepIntervalKey = stringPreferencesKey("sweep_interval")
+    private val notificationsEnabledKey = booleanPreferencesKey("notifications_enabled")
 
     /**
      * The chosen [ThemeMode], defaulting to [ThemeMode.SYSTEM].
@@ -86,5 +88,23 @@ public class SettingsStore(private val context: Context) {
 
     public suspend fun setSweepInterval(interval: SweepInterval) {
         context.settingsDataStore.edit { prefs -> prefs[sweepIntervalKey] = interval.name }
+    }
+
+    /**
+     * Whether the low-battery notification is allowed to post, defaulting to
+     * `true`.
+     *
+     * Separate from [sweepInterval]: turning sweeps off stops new readings
+     * entirely, which is a bigger decision than "don't notify me about the
+     * readings you already take." This only silences [BatteryNotifier];
+     * [BatterySweepWorker] keeps sweeping and the widget keeps showing
+     * whatever it last read either way.
+     */
+    public val notificationsEnabled: Flow<Boolean> = context.settingsDataStore.data.map { prefs ->
+        prefs[notificationsEnabledKey] ?: true
+    }.distinctUntilChanged()
+
+    public suspend fun setNotificationsEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs -> prefs[notificationsEnabledKey] = enabled }
     }
 }

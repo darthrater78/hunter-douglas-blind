@@ -49,6 +49,7 @@ public class BatterySweepWorker(
 
         val shadeStore = ShadeStore(applicationContext)
         val batteryReader = BatteryReader(applicationContext, shadeStore)
+        val settingsStore = SettingsStore(applicationContext)
 
         val candidates = shadeStore.shades.first().values.filterNot { it.mainsPowered }
         if (candidates.isEmpty()) return Result.success()
@@ -79,7 +80,12 @@ public class BatterySweepWorker(
             }
         }
 
-        BatteryNotifier(applicationContext).notifyLowBatteries(low)
+        // The sweep runs and the readings are recorded either way; this is the
+        // one place a "no notifications" preference can take effect, since
+        // BatteryNotifier itself has no view of settings.
+        if (settingsStore.notificationsEnabled.first()) {
+            BatteryNotifier(applicationContext).notifyLowBatteries(low)
+        }
 
         // Success even when some reads failed. Retrying the whole sweep because
         // one shade was out of range would reconnect to every other shade too,

@@ -1,8 +1,10 @@
 package com.scrivtech.powerview.app
 
 import android.Manifest
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -97,6 +99,7 @@ public class MainActivity : ComponentActivity() {
             val themeMode by settingsViewModel.themeMode.collectAsState()
             val tileActionId by settingsViewModel.tileActionId.collectAsState()
             val sweepInterval by settingsViewModel.sweepInterval.collectAsState()
+            val notificationsEnabled by settingsViewModel.notificationsEnabled.collectAsState()
 
             PowerViewTheme(mode = themeMode) {
                 Surface {
@@ -110,9 +113,19 @@ public class MainActivity : ComponentActivity() {
                         sweepInterval = sweepInterval,
                         onSweepIntervalChange = settingsViewModel::setSweepInterval,
                         onSweepNow = settingsViewModel::sweepNow,
+                        notificationsEnabled = notificationsEnabled,
+                        onNotificationsEnabledChange = settingsViewModel::setNotificationsEnabled,
+                        onOpenSystemNotificationSettings = { openSystemNotificationSettings() },
                     )
                 }
             }
         }
+    }
+
+    /** Opens this app's page in the system notification settings (sound, vibration, importance). */
+    private fun openSystemNotificationSettings() {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        startActivity(intent)
     }
 }
