@@ -52,7 +52,7 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 7. ✅ Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command`, plus the shade list, room grouping and the naming/detail screen.)
 8. ✅ `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Per-rail sliders on the shade detail screen call `ActionRunner` directly. Nothing can succeed until step 5 supplies a keystream — the controls say so rather than failing opaquely.)
 9. Glance widgets: 1×1, then the grid, then the config activity, with pending/failed states. (Stubbed with TODOs in `:widget` — deferred because this container has no Android SDK to compile/verify Glance code against.)
-10. Battery sweep worker and low-battery notifications.
+10. ✅ Battery sweep worker and low-battery notifications. (`BatterySweepWorker`, weekly, skips mains-powered shades; `BatteryNotifier` posts one summary notification at or below `LOW_BATTERY_PERCENT`.)
 11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`.)
 12. Optional: Home Assistant bridge via a Python port of `:protocol` + `bleak` + an ESPHome BLE proxy.
 

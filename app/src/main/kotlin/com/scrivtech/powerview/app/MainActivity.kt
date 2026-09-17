@@ -59,10 +59,23 @@ public class MainActivity : ComponentActivity() {
         // gating this on the prompt would mean never scanning on those devices.
         (application as PowerViewApplication).shadeRepository.startScan()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            requestBlePermissions.launch(
-                arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT),
-            )
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(Manifest.permission.BLUETOOTH_SCAN)
+                add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            // For the weekly low-battery sweep (build order step 10). Asked for
+            // here rather than in context because the sweep runs in the
+            // background on a weekly period — there is no later moment the user
+            // is present for. BatteryNotifier stays silent if this is declined,
+            // and the readings still land in the app either way.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
+        if (wanted.isNotEmpty()) {
+            requestBlePermissions.launch(wanted.toTypedArray())
         }
 
         setContent {

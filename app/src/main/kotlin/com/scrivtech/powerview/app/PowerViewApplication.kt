@@ -6,6 +6,7 @@ import com.scrivtech.powerview.ble.ShadeScanner
 import com.scrivtech.powerview.data.ActionRunner
 import com.scrivtech.powerview.data.ActionStore
 import com.scrivtech.powerview.data.BatteryReader
+import com.scrivtech.powerview.data.BatterySweepWorker
 import com.scrivtech.powerview.data.KeystreamStore
 import com.scrivtech.powerview.data.ShadeRepository
 import com.scrivtech.powerview.data.ShadeStore
@@ -35,6 +36,13 @@ public class PowerViewApplication : Application(), Configuration.Provider {
 
     public val shadeRepository: ShadeRepository by lazy {
         ShadeRepository(shadeScanner, shadeStore, applicationScope)
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        // Safe on every launch: the schedule is KEEP, so an existing weekly
+        // sweep is left running rather than having its interval restarted.
+        BatterySweepWorker.ensureScheduled(this)
     }
 
     override val workManagerConfiguration: Configuration

@@ -36,6 +36,19 @@ All notable changes to this project are documented here.
   shade reported `0xC0` (`0b1100_0000`), which reads like a flags byte rather
   than a speed.
 
+- **The weekly battery sweep and low-battery notifications** (build order step
+  10). `BatterySweepWorker` reads every shade not marked mains-powered and posts
+  one summary notification for those at or below `LOW_BATTERY_PERCENT`.
+  `POST_NOTIFICATIONS` is declared now that something actually posts, as the
+  manifest's own note said to do.
+- The sweep is shaped by the fact that reading a battery costs the shade the
+  power being measured: weekly rather than daily, sequential rather than
+  parallel, skipping mains-powered shades, and bailing out immediately when
+  `BLUETOOTH_CONNECT` is missing instead of working through a dozen doomed
+  connections. A failed read is not retried and not reported — the shade is
+  swept again next week, and a notification about a failed *reading* is noise
+  about the app rather than news about the shades.
+
 ### Added
 - **Saved actions are reachable**: a list screen that runs, edits and deletes
   them, and an editor. Gen 3 shades have no on-shade scenes, so a `ShadeAction`
