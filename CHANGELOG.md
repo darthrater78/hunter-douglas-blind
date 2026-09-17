@@ -37,6 +37,19 @@ All notable changes to this project are documented here.
   than a speed.
 
 ### Added
+- **The app has a real shade list** (build order step 7). `PowerViewApp` hosts a
+  shade list grouped into rooms, and a per-shade detail screen for naming it,
+  filing it in a room, marking it mains-powered, reading its battery and
+  forgetting it. `MainActivity` hosts this instead of the debug scan screen,
+  which becomes one route inside the app rather than the whole of it — it is
+  still what confirms decoding against hardware, and `docs/PROTOCOL.md` §8 still
+  has open questions for it to answer.
+- Shades that have never been saved are listed separately, under "Found
+  nearby", rather than mixed in with set-up ones. Naming one is what persists
+  its `homeId`, and without a `homeId` a shade can never be commanded, so the
+  screen says that rather than presenting the save as cosmetic.
+- `ShadeFormattingTest` in `:ui` — 17 tests over room grouping, capability-gated
+  position display and relative "last seen" text.
 - `ActionResultTest` in `:data` — first unit tests outside `:protocol`, covering
   the aggregation the UI branches on to tell "the whole action is blocked on
   setup" apart from "some shades were unreachable".
@@ -65,6 +78,8 @@ All notable changes to this project are documented here.
   deferred pending an Android SDK to build/verify them against. (`ActionRunner`
   started here and has since moved to `:data` — see Changed.)
 - `:ui`: `DebugScanScreen` — the build-order-step-2 raw scan debug view.
+  (`PowerViewApp`, `ShadeListScreen` and `ShadeDetailScreen` joined it later —
+  see Added above.)
 - `:app`: manifest with BLE/foreground-service/notification permissions,
   `MainActivity`, `PowerViewApplication` (manual DI wiring + `WorkManager`
   configuration).

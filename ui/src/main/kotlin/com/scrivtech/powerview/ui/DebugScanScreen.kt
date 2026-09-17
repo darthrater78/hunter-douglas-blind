@@ -18,11 +18,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.scrivtech.powerview.data.BatteryLevel
 import com.scrivtech.powerview.data.ScanState
 import com.scrivtech.powerview.data.Shade
-import com.scrivtech.powerview.data.batteryLevelOf
-import java.util.Locale
 
 /**
  * Build order step 2: "Scanner + a raw debug screen listing MAC / RSSI /
@@ -182,33 +179,3 @@ private fun ShadeDebugRow(
         }
     }
 }
-
-/**
- * `0x2A19` is a percentage (see `docs/PROTOCOL.md` §1 — this was previously
- * documented as a coarse 10/50/100 bucket and corrected against real
- * hardware), so the number leads and the coarse level follows it.
- */
-private fun batteryText(shade: Shade): String {
-    if (shade.mainsPowered) return "mains-powered"
-    val percent = shade.batteryPercent ?: return "not read yet"
-    val level = when (batteryLevelOf(percent)) {
-        BatteryLevel.LOW -> "low"
-        BatteryLevel.MEDIUM -> "medium"
-        BatteryLevel.HIGH -> "high"
-        // Outside 0..100: not a percentage, so do not pretend to grade it.
-        BatteryLevel.UNKNOWN -> "unrecognised value"
-    }
-    val readAt = shade.batteryReadAt?.let { " at $it" } ?: ""
-    return "$percent% ($level)$readAt"
-}
-
-private fun percent(value: Double?): String =
-    value?.let { String.format(Locale.ROOT, "%.1f%%", it) } ?: "-"
-
-/**
- * Marks a field the shade's capability says it does not have, so a decoded
- * value from an unused byte is not read as a real position. Null capability
- * (nothing decoded yet) annotates nothing.
- */
-private fun unsupported(supported: Boolean?): String =
-    if (supported == false) "  [not supported by capability]" else ""

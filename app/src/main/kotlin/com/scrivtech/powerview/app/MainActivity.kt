@@ -9,20 +9,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import com.scrivtech.powerview.ui.DebugScanScreen
+import com.scrivtech.powerview.ui.PowerViewApp
 import com.scrivtech.powerview.ui.ShadeListViewModel
 
 /**
- * Build order step 2: hosts [DebugScanScreen] so decoded advertisements can
- * be confirmed against real hardware before any writes are attempted.
- * Everything past permission handling and view-model wiring belongs in the
- * `:ui`/`:widget` modules, not here.
+ * Hosts [PowerViewApp]. Everything past permission handling and view-model
+ * wiring belongs in the `:ui`/`:widget` modules, not here.
+ *
+ * This used to host the step-2 debug scan screen directly. That screen is now
+ * one route inside the app rather than the whole of it — still reachable,
+ * because it is what confirmed the advertisement offsets against hardware and
+ * `docs/PROTOCOL.md` §8 still has open questions for it to answer.
  */
 public class MainActivity : ComponentActivity() {
 
     private val viewModel: ShadeListViewModel by viewModels {
         val app = application as PowerViewApplication
-        ShadeListViewModel.Factory(app.shadeRepository, app.batteryReader)
+        ShadeListViewModel.Factory(app.shadeRepository, app.batteryReader, app.shadeStore)
     }
 
     private val requestBlePermissions = registerForActivityResult(
@@ -54,7 +57,7 @@ public class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    DebugScanScreen(viewModel = viewModel)
+                    PowerViewApp(viewModel = viewModel)
                 }
             }
         }
