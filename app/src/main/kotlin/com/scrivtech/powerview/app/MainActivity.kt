@@ -27,10 +27,9 @@ public class MainActivity : ComponentActivity() {
     private val requestBlePermissions = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
-        // The initial scan attempt in ShadeRepository.init typically fails
-        // because it races this very permission prompt — retry once we have
-        // an answer, whatever it was (ShadeRepository.scanState reflects a
-        // denial as ScanState.Failed for the UI to react to).
+        // The scan started in onCreate typically fails because it races this
+        // very prompt — retry once we have an answer (ShadeRepository.scanState
+        // reflects a denial as ScanState.Failed for the UI to react to).
         if (grants[Manifest.permission.BLUETOOTH_SCAN] == true) {
             (application as PowerViewApplication).shadeRepository.startScan()
         }
@@ -38,6 +37,12 @@ public class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ShadeRepository no longer starts scanning from its constructor, so
+        // this is the one place that does. Unconditional, because below API 31
+        // the BLE permissions are install-time and no prompt is shown at all —
+        // gating this on the prompt would mean never scanning on those devices.
+        (application as PowerViewApplication).shadeRepository.startScan()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             requestBlePermissions.launch(

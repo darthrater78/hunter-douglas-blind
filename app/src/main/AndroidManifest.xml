@@ -15,14 +15,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
-    <!-- TODO(build order step 9): required once background command execution
-         (CommandWorker triggered from a widget/tile while the app is
-         backgrounded) starts a foreground service, per spec §3.3. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
-
-    <!-- TODO(build order step 10): battery sweep low-battery notifications, spec §2.5. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Deliberately NOT declared yet, because nothing requests or uses them:
+         - FOREGROUND_SERVICE / FOREGROUND_SERVICE_CONNECTED_DEVICE
+           (build order step 9, spec §3.3) — add together with the <service>
+           element itself. FOREGROUND_SERVICE_CONNECTED_DEVICE without a
+           matching declared service is also a Play review failure.
+         - POST_NOTIFICATIONS (build order step 10, spec §2.5) — add with the
+           battery-sweep notifications.
+         Declaring a permission before the feature that needs it costs the user
+         a scarier install prompt and buys nothing. -->
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 

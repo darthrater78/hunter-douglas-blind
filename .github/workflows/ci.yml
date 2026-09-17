@@ -2,9 +2,16 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # Every branch, not just the default one: the release workflow's gate
+    # requires a passing CI run for the exact commit being tagged, and a
+    # pre-release tag (v1.0.0-dev.1) is explicitly allowed to come from a
+    # feature branch. If CI never ran there, that tag can never be released.
+    branches: ['**']
   pull_request:
     branches: [main, master]
+  # The gate's error message tells you to dispatch CI by hand when no run
+  # exists for a commit. That advice only works if this trigger is here.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,7 +23,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -29,14 +36,16 @@ jobs:
           java-version: '17'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@ac638b010cf753c3731813f9302c85b32d0b30b0 # v4.4.1
+        uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4.4.4
 
-      # :protocol has zero Android dependencies, so its tests are the one
-      # thing this workflow can prove even before the Android SDK/toolchain
-      # versions below have been confirmed (see gradle/libs.versions.toml —
-      # several are UNVERIFIED because Google's Maven repo was unreachable
-      # from the container that wrote this scaffold).
-      - name: Test :protocol (pure JVM, no Android SDK needed)
+      # Runs first because it is the fastest failure signal in the build: the
+      # frame/keystream math is the part with real test coverage, so a
+      # regression there surfaces in seconds instead of after the full Android
+      # compile. Note this does NOT make the step independent of AGP —
+      # Gradle configures every project before running any task, so the root
+      # and :app plugin blocks resolve AGP first regardless of which module
+      # the task belongs to.
+      - name: Test :protocol (pure JVM)
         run: ./gradlew :protocol:test
 
       - name: Build debug APK
@@ -45,6 +54,27 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test
 
-      # ADAPT: add lint check once the app has enough surface area for it to be worth gating on
+      # The debug APK is the one you can actually install to test with: Gradle
+      # signs it with the local debug keystore, so unlike the release APK it
+      # needs no secrets. Building it without publishing it anywhere left
+      # nothing to download, which is the whole point of a CI build for an app.
+      # Retention is short because these are throwaway test builds.
+      - name: Upload debug APK
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: powerview-debug-apk-${{ github.sha }}
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      # Exercises R8 on every push. Without this, a bad/missing keep rule only
+      # ever shows up during a release build, which is the worst time to find it.
+      - name: Build release APK (exercises R8 shrinking)
+        run: ./gradlew assembleRelease
+
+      # ADAPT: enable once the app has enough surface area for lint to be worth
+      # gating on. Left off deliberately — turning it on blind, in a container
+      # with no Android SDK to run it in first, is a good way to hand you a red
+      # CI on the run that is supposed to prove CI works again.
       # - name: Lint
       #   run: ./gradlew lint

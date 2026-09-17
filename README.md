@@ -103,23 +103,55 @@ field, and a few others. All need real hardware to resolve.
 
 ## CI/CD
 
-- `.github/workflows/ci.yml` — builds `:protocol` tests standalone (no SDK
-  dependency), then `assembleDebug` + `test` across every module, on every
-  push/PR to the default branch.
-- `.github/workflows/release.yml` — on a `v*` tag: verifies the tag is on
-  the default branch and CI passed for that commit, builds an APK, and
-  attaches it to a GitHub release. **Produces an unsigned APK as scaffolded**
-  — add a signing config (commented-out steps in the workflow show the
-  keystore-secret pattern) before shipping a real release.
+- `.github/workflows/ci.yml` — runs `:protocol`'s tests first (fastest failure
+  signal), then `assembleDebug`, `test` and `assembleRelease` across every
+  module. Triggers on every branch, on PRs to the default branch, and on
+  manual dispatch. All three matter: the release gate below requires a CI run
+  for the exact commit being tagged, and pre-release tags are allowed to come
+  from feature branches.
+- `.github/workflows/release.yml` — on a `v*` tag: verifies the tag is on the
+  default branch and that CI passed for that commit, builds the APK, checks it
+  is signed and not debug-signed, then attaches it to a GitHub release.
+- `.github/workflows/lint-workflows.yml` — actionlint over
+  `.github/workflows/**` (checksum-verified binary), so a broken workflow file
+  is caught without waiting for the full Android build.
 - `.github/dependabot.yml` — weekly PRs for GitHub Actions and Gradle
   dependencies.
+
+### Release signing
+
+`app/build.gradle.kts` builds a signed release APK when these environment
+variables are set, and an **unsigned** one when they are not:
+
+| Variable | Release workflow secret |
+|---|---|
+| `RELEASE_KEYSTORE_PATH` | derived from `KEYSTORE_BASE64` |
+| `RELEASE_KEYSTORE_PASSWORD` | `KEYSTORE_PASSWORD` |
+| `RELEASE_KEY_ALIAS` | `KEY_ALIAS` |
+| `RELEASE_KEY_PASSWORD` | `KEY_PASSWORD` |
+
+Until those four repository secrets exist, the release workflow **fails
+instead of publishing**. That is deliberate: an unsigned APK cannot be
+installed (`INSTALL_PARSE_FAILED_NO_CERTIFICATES`), so publishing one produces
+a release that looks fine and is useless to every user who downloads it.
+
+Generate a keystore with `keytool -genkeypair -keystore release.keystore
+-alias release -keyalg RSA -keysize 2048 -validity 10000`, then
+`base64 -w0 release.keystore` into the `KEYSTORE_BASE64` secret. Never commit
+the keystore — `.gitignore` already covers `*.keystore`/`*.jks`.
 
 ## Security notes
 
 - The write keystream (spec §1.4/§4) is stored via `EncryptedSharedPreferences`
   (Android Keystore-backed), separate from the plain shade metadata blob —
-  see `KeystreamStore` vs `ShadeStore`.
+  see `KeystreamStore` vs `ShadeStore`. It is excluded from cloud backup and
+  device-to-device transfer (`data_extraction_rules.xml`, `backup_rules.xml`).
 - BLE permissions are scoped to `neverForLocation` since the app filters on
-  manufacturer data, not beacons.
+  manufacturer data, not beacons. Permissions for features that are not built
+  yet (foreground service, notifications) are deliberately **not** declared —
+  they go in alongside the code that needs them.
+- Release builds run R8 (`isMinifyEnabled = true`). `app/proguard-rules.pro`
+  keeps the two things reached reflectively: `@Serializable` models in `:data`
+  and `CommandWorker`, which `WorkManager` resolves by class name.
 - No network calls exist anywhere in this app (by design — no Gateway, no
   account) — nothing here talks to the internet at all.

@@ -37,30 +37,54 @@ public data class ShadeMetadata(
 public class ShadeStore(private val context: Context) {
 
     private val key = stringPreferencesKey("shades_json")
+    private val quarantineKey = stringPreferencesKey("shades_json_unreadable")
     private val json = Json { ignoreUnknownKeys = true }
 
-    /** All known shades, keyed by MAC address. Empty map (not an error) until anything has been saved. */
+    /**
+     * All known shades, keyed by MAC address. Empty map (not an error) until
+     * anything has been saved, and also if the stored blob cannot be parsed —
+     * see [upsert] for what happens to an unparseable blob rather than it
+     * simply being overwritten.
+     */
     public val shades: Flow<Map<String, ShadeMetadata>> = context.shadeMetadataDataStore.data.map { prefs ->
-        val raw = prefs[key] ?: return@map emptyMap()
-        runCatching { json.decodeFromString<Map<String, ShadeMetadata>>(raw) }.getOrDefault(emptyMap())
+        decodeOrNull(prefs[key]) ?: emptyMap()
     }
 
     /** Inserts or replaces the metadata for [metadata.macAddress]. */
     public suspend fun upsert(metadata: ShadeMetadata) {
-        context.shadeMetadataDataStore.edit { prefs ->
-            val current = prefs[key]?.let {
-                runCatching { json.decodeFromString<Map<String, ShadeMetadata>>(it) }.getOrDefault(emptyMap())
-            } ?: emptyMap()
-            prefs[key] = json.encodeToString(current + (metadata.macAddress to metadata))
-        }
+        edit { current -> current + (metadata.macAddress to metadata) }
     }
 
     public suspend fun remove(macAddress: String) {
+        edit { current -> current - macAddress }
+    }
+
+    /**
+     * Reads, transforms and writes back the stored map.
+     *
+     * The important part is what happens when the stored blob does not parse
+     * (corruption, or a schema change `ignoreUnknownKeys` cannot absorb, such
+     * as a newly added non-optional field). Treating that as "no data" and
+     * writing the transformed empty map back would destroy every label, room
+     * and capability the user has entered, silently and unrecoverably. Instead
+     * the unreadable blob is moved aside under [quarantineKey] first, so it
+     * survives for a future migration or manual recovery, and only then does
+     * the store start fresh.
+     */
+    private suspend fun edit(transform: (Map<String, ShadeMetadata>) -> Map<String, ShadeMetadata>) {
         context.shadeMetadataDataStore.edit { prefs ->
-            val current = prefs[key]?.let {
-                runCatching { json.decodeFromString<Map<String, ShadeMetadata>>(it) }.getOrDefault(emptyMap())
-            } ?: emptyMap()
-            prefs[key] = json.encodeToString(current - macAddress)
+            val raw = prefs[key]
+            val current = decodeOrNull(raw)
+            if (current == null && raw != null) {
+                prefs[quarantineKey] = raw
+            }
+            prefs[key] = json.encodeToString(transform(current ?: emptyMap()))
         }
+    }
+
+    /** Null means "present but unreadable"; an empty map means "nothing stored yet". */
+    private fun decodeOrNull(raw: String?): Map<String, ShadeMetadata>? {
+        if (raw == null) return emptyMap()
+        return runCatching { json.decodeFromString<Map<String, ShadeMetadata>>(raw) }.getOrNull()
     }
 }

@@ -1,12 +1,12 @@
 # Dev Skills gate state
 Track: work commit (no version bump, no artifact publish, no release)
-Version: n/a — this is scaffolding, not a release
+Version: n/a — still pre-release scaffolding
 Updated: 2026-09-17
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ⬜ not owed on a work commit (see notes — :protocol verified anyway)
-🔒 SECURITY   ✅ self-reviewed, see notes below
-📄 DOCS       ⬜ not owed on a work commit (README/CHANGELOG/docs/PROTOCOL.md written anyway)
+🔨 BUILD      ⬜ not owed on a work commit (see notes — what was verifiable was verified)
+🔒 SECURITY   ✅ full audit run, 0 Critical / 0 High outstanding — see notes
+📄 DOCS       ⬜ not owed on a work commit (README/CHANGELOG updated anyway)
 📦 RELEASE    ⬜ not owed on a work commit
 🚀 SHIP       ⬜ not owed on a work commit
 
@@ -16,43 +16,70 @@ Repo: https://github.com/darthrater78/hunter-douglas-blind
 Branch: claude/load-dev-skills-d0bioe
 
 ## What this commit is
-Initial multi-module Gradle scaffold for the PowerView Gen 3 BLE Android app
-(per the user-supplied implementation spec) plus CI/CD workflows. See
-CHANGELOG.md "Unreleased" section for the full contents list.
+Workflow audit + full project audit of the PowerView Gen 3 BLE scaffold, and
+the fixes for everything it found. See CHANGELOG.md "Unreleased" → Fixed /
+Changed for the itemised list.
+
+Audit totals before fixes: 1 Critical, 5 High, 11 Medium, 4 Low.
+Outstanding after fixes: 0 Critical, 0 High. Three Medium items cannot be
+closed from this container — listed under "Not fixed" below.
+
+## Security gate notes
+Ran with SECURITY_REFERENCE.md + SECURITY_ANDROID.md + QUALITY_REFERENCE.md +
+QUALITY_ANDROID.md loaded, and the WORKFLOW_REFERENCE.md workflow audit
+procedure over all of `.github/workflows/`.
+
+Verified clean (unchanged from the previous review, re-confirmed):
+- No network code anywhere, no eval/exec/shell/reflection, no SQL, no WebView.
+- No logging of any kind (`Log.`/`println`/`printStackTrace` all absent), so no
+  PII or keystream can reach logcat.
+- One key-like literal in the repo: the openHAB binding's own published AES
+  test vector, in `:protocol` test sources only. Not a credential.
+- Single exported component is the launcher activity, as required.
+- Keystream in EncryptedSharedPreferences, excluded from cloud backup and
+  device transfer; plain metadata kept in a separate unencrypted store.
+- `.gitignore` covers `*.jks`, `*.keystore`, `local.properties`.
+
+Fixed in this commit — the Critical and both Highs from the code audit:
+- `gradle/actions/setup-gradle` pinned to a SHA present in no tag of that repo
+  and not fetchable from it, which meant CI could never pass and therefore the
+  release gate could never be satisfied. Verified against `git ls-remote` and a
+  direct fetch attempt; repinned to v4.4.4.
+- Release published an unsigned (uninstallable) APK, and the step meant to
+  catch exactly that only checked the filename extension.
+- GATT client registration leaked on every failed/dropped connection.
+- Two uncaught exception paths in the widget/worker command surface.
+- Silent total data loss on one unparseable persisted blob.
 
 ## Build gate notes
-No Android SDK is installed in this container, so the Android modules
-(:app/:ble/:data/:ui/:widget) could not be compiled here. :protocol has zero
-Android dependencies and WAS built + tested standalone in an isolated
-temp Gradle project (Gradle 8.14.3, JDK 21, offline after initial wrapper/
-Maven Central resolution) — 39 tests pass, including all 5 sniffed AES-CTR
-frame vectors re-encrypted end-to-end and matched byte-for-byte. CI
-(.github/workflows/ci.yml) builds the full project on a GitHub-hosted
-runner with the Android SDK preinstalled.
+Verified here:
+- `:protocol` — 39 tests, 0 failures, re-run after the changes in an isolated
+  Gradle project (Gradle 8.14.3, Maven Central only). Includes all five sniffed
+  AES-CTR vectors re-encrypting byte-for-byte.
+- All three workflow files pass `actionlint` 1.7.12 (checksum-verified binary),
+  which shellchecks every `run:` block, and parse as YAML.
 
-## Security gate notes (self-review, no separate audit tool run)
-- No eval/exec/shell/reflection, no SQL, no network code anywhere (by
-  design — no Gateway, no account, nothing talks to the internet).
-- No hardcoded secrets. The one embedded key-like literal is the openHAB
-  binding's own published AES test vector key, used only in :protocol's
-  test suite to verify frame encryption against known ciphertexts — not a
-  real credential.
-- The one real secret in the app (the per-home write keystream — anyone
-  with it can command every shade in the house) is stored via
-  EncryptedSharedPreferences (Android Keystore-backed) in KeystreamStore,
-  kept separate from the plain-text ShadeStore metadata blob.
-- Found and fixed during this review: android:allowBackup="true" had no
-  exclusion rules, which would have swept the encrypted keystream store
-  into cloud backup / device-transfer. Added data_extraction_rules.xml
-  (API 31+) and backup_rules.xml (legacy) excluding shade_keystreams.xml
-  specifically, while still backing up plain shade labels/rooms/actions
-  (legitimate UX value, no secret).
-- BLE permissions scoped correctly (neverForLocation, since filtering is on
-  manufacturer data, not beacons).
-- No dependency audit tool (npm/pip/cargo-audit equivalent) was run: no
-  ecosystem lockfile exists yet to audit against (first real
-  ./gradlew build, which needs network + Android SDK, will resolve one).
-  AGP/AndroidX versions are flagged UNVERIFIED in gradle/libs.versions.toml
-  because Google's Maven repo (the only place that metadata is published)
-  was unreachable from this container's network policy — flagged loudly
-  in-file and in the README rather than silently guessed as fact.
+NOT verified here, and this is the risk to know about: the Android modules
+(`:app`/`:ble`/`:data`/`:ui`/`:widget`) still cannot be compiled in this
+container — no Android SDK, and Google Maven (`dl.google.com`/
+`maven.google.com`) remains unreachable under this container's network policy,
+so AGP itself will not resolve. `./gradlew :protocol:test` fails here for that
+reason alone, at the root project's plugin block, before touching `:protocol`.
+The Kotlin changes to those five modules are reviewed but uncompiled. CI is the
+first thing that will actually compile them. Highest-risk file:
+`app/build.gradle.kts` (new `signingConfigs` block + `signingConfig =
+signingConfigs.findByName("release")`).
+
+## Not fixed — blocked, not skipped
+- Gradle dependency locking and `gradle/verification-metadata.xml`: both are
+  generated from a successful dependency resolution, which needs Google Maven.
+- The `UNVERIFIED` versions in `gradle/libs.versions.toml` (AGP 8.7.3,
+  compileSdk/targetSdk 35, every AndroidX line): same blocker. Re-tested this
+  session — `maven.google.com` returns an empty body, `dl.google.com` fails
+  outright. Maven Central is reachable, and `kotlin 2.4.20` /
+  `kotlinx-coroutines 1.11.0` were confirmed current from it. Dependabot is
+  configured for both ecosystems and will correct the rest on its first run,
+  which is now possible because CI can run again.
+- `androidx.security:security-crypto 1.1.0-alpha06` guarding the keystream:
+  its current upstream status cannot be checked from here. Worth a deliberate
+  decision before a real release rather than carrying an alpha forward.

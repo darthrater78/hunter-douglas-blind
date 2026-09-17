@@ -1,7 +1,12 @@
 package com.scrivtech.powerview.widget
 
+import android.Manifest
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothManager
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import com.scrivtech.powerview.ble.ShadeGattClient
 import com.scrivtech.powerview.data.Command
 import com.scrivtech.powerview.data.KeystreamStore
@@ -9,7 +14,9 @@ import com.scrivtech.powerview.data.ShadeAction
 import com.scrivtech.powerview.data.ShadeStore
 import com.scrivtech.powerview.protocol.CommandFrameBuilder
 import com.scrivtech.powerview.protocol.FrameCipher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -23,6 +30,11 @@ import java.util.concurrent.atomic.AtomicInteger
  * This is deliberately runnable from in-app buttons before any widget code
  * exists (build order step 8): [CommandWorker] and the Glance widgets both
  * call this same class.
+ *
+ * Nothing here is allowed to throw. Every caller is a background surface with
+ * no UI attached — a widget tap or a `WorkManager` job — so an exception is
+ * not something a user can be asked about; it just becomes a crash or an
+ * opaque failed work item.
  */
 public class ActionRunner(
     private val context: Context,
@@ -44,19 +56,43 @@ public class ActionRunner(
     /**
      * @return false on any failure: unknown shade (cold start with no
      *   persisted metadata), no keystream yet for the shade's home
-     *   (onboarding not done, spec §2.4), Bluetooth unavailable, or the GATT
-     *   connect/discover/write sequence failing (most commonly out-of-range,
-     *   spec §3.4). Callers needing to distinguish these should inspect
-     *   [ShadeStore]/[KeystreamStore] themselves before calling — this
+     *   (onboarding not done, spec §2.4), missing `BLUETOOTH_CONNECT`,
+     *   Bluetooth unavailable or switched off, a malformed stored MAC, or the
+     *   GATT connect/discover/write sequence failing (most commonly
+     *   out-of-range, spec §3.4). Callers needing to distinguish these should
+     *   inspect [ShadeStore]/[KeystreamStore] themselves before calling — this
      *   method intentionally collapses them to a single failure for [run].
      */
     private suspend fun runCommand(command: Command): Boolean {
+        // ShadeGattClient is annotated @SuppressLint("MissingPermission") and
+        // documents that its caller must hold BLUETOOTH_CONNECT. This is that
+        // caller, and it runs from surfaces with no UI to prompt from, so an
+        // unchecked SecurityException here would surface as a crash rather than
+        // a failed command.
+        if (!hasConnectPermission(context)) return false
+
         val metadata = shadeStore.shades.first()[command.macAddress] ?: return false
         val homeId = metadata.homeId ?: return false
-        val keystream = keystreamStore.get(homeId) ?: return false
 
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
-        val device = adapter.getRemoteDevice(command.macAddress)
+        // A corrupt stored value throws out of the hex decode; treat it the
+        // same as "no keystream yet" rather than taking the process down.
+        val keystream = runCatching { keystreamStore.get(homeId) }.getOrNull() ?: return false
+
+        val adapter = ContextCompat.getSystemService(context, BluetoothManager::class.java)?.adapter
+            ?: return false
+        if (!adapter.isEnabled) return false
+
+        // MACs come out of persisted JSON (ActionStore), so a corrupt or
+        // hand-edited store reaches getRemoteDevice, which throws
+        // IllegalArgumentException on anything that is not a well-formed
+        // address. This used to sit outside the try and escape run().
+        val device = runCatching {
+            require(BluetoothAdapter.checkBluetoothAddress(command.macAddress)) {
+                "malformed MAC address: ${command.macAddress}"
+            }
+            adapter.getRemoteDevice(command.macAddress)
+        }.getOrNull() ?: return false
+
         val client = ShadeGattClient(context, device)
 
         return try {
@@ -72,8 +108,16 @@ public class ActionRunner(
             )
             val ciphertext = FrameCipher.xorWithKeystream(plaintext, keystream)
             client.writeCommand(ciphertext)
+        } catch (e: SecurityException) {
+            // The permission can be revoked between the check above and the
+            // call itself; that is a failed command, not a crash.
+            false
         } finally {
-            client.disconnect()
+            // NonCancellable because disconnect() is the only thing that
+            // releases the GATT client registration. If this coroutine is
+            // cancelled (widget teardown, WorkManager stopping the worker), a
+            // plain suspend call here would throw immediately and leak it.
+            withContext(NonCancellable) { client.disconnect() }
         }
     }
 
@@ -82,4 +126,16 @@ public class ActionRunner(
             .getOrPut(macAddress) { AtomicInteger(Byte.MIN_VALUE.toInt()) }
             .getAndIncrement()
             .toByte()
+
+    public companion object {
+        /**
+         * `BLUETOOTH_CONNECT` is only a runtime permission from API 31; before
+         * that the legacy install-time `BLUETOOTH` permission in the manifest
+         * covers it. Mirrors `ShadeScanner.hasScanPermission`.
+         */
+        public fun hasConnectPermission(context: Context): Boolean =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
+    }
 }

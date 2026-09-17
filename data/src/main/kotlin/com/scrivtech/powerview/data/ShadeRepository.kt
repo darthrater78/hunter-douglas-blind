@@ -32,8 +32,9 @@ public sealed interface ScanState {
  * not depend on a scan having run first.
  *
  * The caller supplies [scope] (an application-scoped `CoroutineScope`) and
- * owns starting/stopping the underlying scan by cancelling it — this class
- * does not itself decide when scanning should be active.
+ * owns the scan lifecycle: nothing is scanned until [startScan] is called, and
+ * scanning stops when [scope] is cancelled. This class does not itself decide
+ * when scanning should be active.
  */
 public class ShadeRepository(
     private val scanner: ShadeScanner,
@@ -49,17 +50,21 @@ public class ShadeRepository(
     private var scanJob: Job? = null
 
     init {
-        startScan()
+        // Metadata collection only reads from DataStore, so it is safe to start
+        // here. Scanning is NOT started from init: doing so published `this` to
+        // a coroutine before the constructor had finished, and it contradicted
+        // this class's own contract that the caller decides when scanning is
+        // active. Call [startScan] explicitly — MainActivity does, both on
+        // create and again once BLUETOOTH_SCAN is granted.
         scope.launch { shadeStore.shades.collect(::applyMetadata) }
     }
 
     /**
-     * (Re)starts the scan collector. The initial attempt in [init] typically
-     * runs before a runtime permission prompt (API 31+) has been answered,
-     * so it commonly ends in [ScanState.Failed] immediately — call this again
-     * once `BLUETOOTH_SCAN` is granted (e.g. from the
-     * `ActivityResultContracts.RequestMultiplePermissions` callback) to
-     * actually pick up scanning. Safe to call repeatedly; cancels any
+     * (Re)starts the scan collector. The first call typically races a runtime
+     * permission prompt (API 31+) and so commonly ends in [ScanState.Failed]
+     * immediately — call this again once `BLUETOOTH_SCAN` is granted (e.g.
+     * from the `ActivityResultContracts.RequestMultiplePermissions` callback)
+     * to actually pick up scanning. Safe to call repeatedly; cancels any
      * in-flight attempt first.
      */
     public fun startScan() {

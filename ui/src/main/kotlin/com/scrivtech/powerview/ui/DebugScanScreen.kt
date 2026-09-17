@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.scrivtech.powerview.data.Shade
+import java.util.Locale
 
 /**
  * Build order step 2: "Scanner + a raw debug screen listing MAC / RSSI /
@@ -52,8 +53,8 @@ private fun ShadeDebugRow(shade: Shade) {
             Text(shade.macAddress, style = MaterialTheme.typography.titleMedium)
             Text("homeId: ${shade.homeId ?: "?"}  typeId: ${shade.state?.typeId ?: "?"}")
             Text(
-                "primary: ${shade.state?.primaryPercent?.let { "%.1f%%".format(it) } ?: "-"}  " +
-                    "secondary: ${shade.state?.secondaryPercent?.let { "%.1f%%".format(it) } ?: "-"}  " +
+                "primary: ${shade.state?.primaryPercent?.let { String.format(Locale.ROOT, "%.1f%%", it) } ?: "-"}  " +
+                    "secondary: ${shade.state?.secondaryPercent?.let { String.format(Locale.ROOT, "%.1f%%", it) } ?: "-"}  " +
                     "tilt: ${shade.state?.tiltPercent?.let { "$it%" } ?: "-"}",
             )
             val capabilitySuffix = if (shade.capabilities?.isKnownType == false) " (unknown typeId)" else ""
