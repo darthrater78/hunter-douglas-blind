@@ -1,5 +1,6 @@
 package com.scrivtech.powerview.widget
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.ComponentName
 import android.content.Context
@@ -136,7 +137,10 @@ public class QuickSettingsTile : TileService() {
                 PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE),
             )
         } else {
+            // Only reached below API 34, where this overload is the only one.
+            // Lint flags the call regardless of the SDK_INT branch around it.
             @Suppress("DEPRECATION")
+            @SuppressLint("StartActivityAndCollapseDeprecated")
             startActivityAndCollapse(intent)
         }
     }

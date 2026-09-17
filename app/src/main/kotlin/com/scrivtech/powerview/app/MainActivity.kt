@@ -10,6 +10,7 @@ import androidx.activity.viewModels
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.scrivtech.powerview.ble.ShadeScanner
 import com.scrivtech.powerview.data.BatterySweepWorker
 import com.scrivtech.powerview.ui.ActionsViewModel
 import com.scrivtech.powerview.ui.PowerViewApp
@@ -54,7 +55,7 @@ public class MainActivity : ComponentActivity() {
         // The scan started in onCreate typically fails because it races this
         // very prompt — retry once we have an answer (ShadeRepository.scanState
         // reflects a denial as ScanState.Failed for the UI to react to).
-        if (grants[Manifest.permission.BLUETOOTH_SCAN] == true) {
+        if (grants[ShadeScanner.scanPermission()] == true) {
             (application as PowerViewApplication).shadeRepository.startScan()
         }
     }
@@ -63,15 +64,20 @@ public class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // ShadeRepository no longer starts scanning from its constructor, so
-        // this is the one place that does. Unconditional, because below API 31
-        // the BLE permissions are install-time and no prompt is shown at all —
-        // gating this on the prompt would mean never scanning on those devices.
+        // this is the one place that does. Unconditional, so that a device
+        // where the permission is already granted scans without waiting for
+        // the prompt callback, which is not called when nothing is asked.
         (application as PowerViewApplication).shadeRepository.startScan()
 
         val wanted = buildList {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 add(Manifest.permission.BLUETOOTH_SCAN)
                 add(Manifest.permission.BLUETOOTH_CONNECT)
+            } else {
+                // Below API 31 the Bluetooth permissions are install-time, but a
+                // scan also needs location, and that is a runtime permission.
+                // Without it the scan runs and returns nothing.
+                add(Manifest.permission.ACCESS_FINE_LOCATION)
             }
             // For the weekly low-battery sweep (build order step 10). Asked for
             // here rather than in context because the sweep runs in the

@@ -94,9 +94,10 @@ jobs:
       - name: Build release APK (exercises R8 shrinking)
         run: ./gradlew assembleRelease
 
-      # ADAPT: enable once the app has enough surface area for lint to be worth
-      # gating on. Left off deliberately — turning it on blind, in a container
-      # with no Android SDK to run it in first, is a good way to hand you a red
-      # CI on the run that is supposed to prove CI works again.
-      # - name: Lint
-      #   run: ./gradlew lint
+      # Full lint on every module. assembleRelease above only runs
+      # lintVitalRelease, which passed while full lint was failing, and full
+      # lint's MissingPermission/InlinedApi findings are what led to a real bug
+      # (scanning checked BLUETOOTH_SCAN on API 26-30, where it does not exist,
+      # so Android 8-11 never scanned). Enabled after passing locally.
+      - name: Lint
+        run: ./gradlew lint
