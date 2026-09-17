@@ -8,6 +8,7 @@ import com.scrivtech.powerview.data.ActionStore
 import com.scrivtech.powerview.data.BatteryReader
 import com.scrivtech.powerview.data.BatterySweepWorker
 import com.scrivtech.powerview.data.KeystreamStore
+import com.scrivtech.powerview.data.SettingsStore
 import com.scrivtech.powerview.data.ShadeRepository
 import com.scrivtech.powerview.data.ShadeStore
 import com.scrivtech.powerview.widget.CommandWorker
@@ -30,6 +31,7 @@ public class PowerViewApplication : Application(), Configuration.Provider {
     public val shadeStore: ShadeStore by lazy { ShadeStore(this) }
     public val keystreamStore: KeystreamStore by lazy { KeystreamStore(this) }
     public val actionStore: ActionStore by lazy { ActionStore(this) }
+    public val settingsStore: SettingsStore by lazy { SettingsStore(this) }
     public val batteryReader: BatteryReader by lazy { BatteryReader(this, shadeStore) }
     public val shadeScanner: ShadeScanner by lazy { ShadeScanner(this) }
     public val actionRunner: ActionRunner by lazy { ActionRunner(this, shadeStore, keystreamStore) }

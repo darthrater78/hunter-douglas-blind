@@ -1,7 +1,7 @@
 # Handoff
 
-Written 2026-09-17. Branch `claude/load-dev-skills-d0bioe` at `3fe7a27` — not
-merged, no PR open, no release tagged.
+Written 2026-09-17, updated the same day in a second session. Branch
+`claude/load-dev-skills-d0bioe` — not merged, no PR open, no release tagged.
 
 This is the state-of-play document for whoever picks the project up next. The
 README describes what the app is meant to be; this describes what is actually
@@ -20,9 +20,10 @@ was in range. Keep that distinction alive as you work; it is why the debug
 screen still shows raw bytes next to decoded fields, and why the control
 sliders are labelled with percentages rather than "Open" and "Close".
 
-**Nothing in this app can move a shade yet.** Every other build-order step is
-done. The one remaining blocker is keystream onboarding (step 5), which was
-deliberately deferred to last at the user's request. The UI is built to say so
+**Nothing in this app can move a shade yet.** The one remaining blocker is
+keystream onboarding (step 5), which is deliberately last — the user
+reconfirmed that ordering when this session offered to start it. Do not pull
+it forward; build steps 6, 9 and 11 around it first. The UI is built to say so
 out loud rather than failing opaquely — see "The no-keystream state" below.
 
 Build order progress (numbering follows the README):
@@ -37,14 +38,28 @@ Build order progress (numbering follows the README):
 | 6 Derive-from-capture, tilt, secondary | ⬜ core classes exist, no UI |
 | 7 Persistence, labels/rooms, actions | ✅ shade list, rooms, naming, action editor |
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
-| 9 Glance widgets | ⬜ TODO stubs only |
+| 9 Glance widgets | ⬜ TODO stubs only — **next** |
 | 10 Battery sweep + notifications | ✅ weekly sweep, one summary notification |
 | 11 Quick Settings tile | ⬜ TODO stub only |
 | 12 Home Assistant bridge | ⬜ optional |
 
+Appearance is not a build-order step. A theme picker (Follow system / Light /
+Dark / Black (OLED)) landed in the second session; see the CHANGELOG entry for
+why the OLED scheme's containers are not themselves black.
+
 ---
 
-## What changed this session
+## What changed in the second session
+
+A theme picker with an OLED black option — not a build-order step, asked for
+directly. `SettingsStore`/`ThemeMode` in `:data`, `PowerViewTheme` plus a
+settings screen in `:ui`, and the shades app bar's two text buttons collapsed
+into a `More` overflow to make room for a third destination. The design
+reasoning (why the OLED containers are not themselves black, why `surfaceTint`
+has to be black, why OLED ignores the system setting) is in the CHANGELOG
+entry rather than repeated here.
+
+## What changed in the first session
 
 Five commits, each green in CI (`1a99674`, `9e7760c`, `dac12fe`, `1a99a41`,
 `3fe7a27` — confirm the last one, see "CI status" below).
@@ -158,11 +173,30 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## Next step: step 5, and the decision still open
+## Next step: steps 9 and 11, with step 5 still last
 
-**Keystream import and the first real write.** Everything underneath it is
-confirmed, every surface that needs it is built, and it is the only thing
-standing between this app and actually controlling a shade.
+**Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
+that when this session offered to start it. The previous version of this
+document recommended pulling it forward; that recommendation is withdrawn.
+What follows is kept because the decision it records is still open and will
+still be needed when step 5's turn comes.
+
+So the work in front of you is **step 9 (Glance widgets)** and then **step 11
+(Quick Settings tile and shortcuts)**. Both are stubbed with TODOs in
+`:widget` that spell out what they need to do, and both already have their
+`ActionRunner` → `CommandWorker` path built and green. Neither can be
+exercised until step 5 supplies a keystream, which is fine: every surface they
+drive already reports `NotAttempted.NoKeystream` honestly.
+
+Two things to know before starting step 9. `:widget` has neither the Compose
+compiler plugin nor `buildFeatures { compose = true }`, and Glance composables
+need both. And expedited `WorkManager` work below API 31 requires
+`getForegroundInfo()`, i.e. a foreground service plus the two
+`FOREGROUND_SERVICE*` permissions the manifest deliberately does not declare —
+with `minSdk = 26` that is a runtime `IllegalStateException` waiting on Android
+8-11, so either use ordinary one-shot work or declare the service properly.
+
+### The step 5 decision, when its turn comes
 
 It needs onboarding UI for one of the three paths in `PROTOCOL.md` §7:
 
@@ -186,12 +220,6 @@ wrapper.
 percent — not a full open. It is the first time this code can move a physical
 object, and the frame layout is the least-verified thing in the project.
 
-After step 5: step 6 (derive-from-capture UI), then 9 and 11 (Glance widgets and
-the Quick Settings tile — both still TODO stubs, both already have their
-`ActionRunner`/`CommandWorker` path built and green).
-
----
-
 ## Verifying work without an Android SDK
 
 **The Android modules cannot be built in the Claude Code container.** No Android
@@ -212,8 +240,9 @@ run:  ./gradlew --project-dir <harness> test
 ```
 
 Files that qualify today: all of `:protocol`, plus `Shade.kt`, `ShadeAction.kt`
-(strip `@Serializable` in the harness only), `ActionResult.kt`, and the `:ui`
-files `ShadeFormatting.kt` and `ActionDraft.kt`. `BatteryLevel`/`batteryLevelOf`
+(strip `@Serializable` in the harness only), `ActionResult.kt`, `ThemeMode.kt`,
+and the `:ui` files `ShadeFormatting.kt`, `ActionDraft.kt` and
+`ThemeSelection.kt`. `BatteryLevel`/`batteryLevelOf`
 live inside `BatteryReader.kt`, which imports Android, so the harness needs a
 small verbatim copy of just those declarations.
 
@@ -224,7 +253,8 @@ and the outcome-wording functions live in `ShadeFormatting.kt` rather than
 inside the Compose files that use them.
 
 Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
-(`ActionResultTest`), 35 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9).
+(`ActionResultTest`), 42 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
+`ThemeSelectionTest` 7).
 
 Also verifiable locally: workflow files with `actionlint`.
 
@@ -234,30 +264,19 @@ Also verifiable locally: workflow files with `actionlint`.
 
 ## CI status
 
-CI is green on `1a99674`, `9e7760c`, `dac12fe` and `1a99a41` — including
-`assembleRelease` with R8, which is where `lintVitalRelease` runs.
+**Green on the branch head.** Run #14 on `0113457` passed, including
+`assembleRelease` with R8, which is where `lintVitalRelease` runs. That run
+also settles the previous session's open question: `0113457` carries the same
+battery-sweep code as `3fe7a27`, so the sweep compiles and no commit on this
+branch is now unverified by a compiler.
 
-`3fe7a27` (the battery sweep) was pushed at the end of the session and its run
-was still in flight when the session ended. It is the one commit here whose
-Android code had not yet been seen by a compiler.
-
-**Check the run for `e0d459b` (the newest commit), not for `3fe7a27`.** CI sets
-`cancel-in-progress: true` on a per-ref concurrency group, so pushing the
-handoff commit will have cancelled the sweep's own run mid-flight. A cancelled
-run is not a failure. `e0d459b` contains the same sweep code plus documentation,
-so its result is the authoritative one:
+The two `cancelled` runs in the history (`3fe7a27`, `e0d459b`) are not
+failures. CI sets `cancel-in-progress: true` on a per-ref concurrency group, so
+each was killed by the push that followed it.
 
 ```
 https://github.com/darthrater78/hunter-douglas-blind/actions
 ```
-
-If it is red, the likely suspects are the notification code in
-`BatteryNotifier.kt` (the `@SuppressLint("MissingPermission")` is there
-pre-emptively because `lintVitalRelease` is fatal on `assembleRelease`) and the
-`PeriodicWorkRequestBuilder` generic call in `BatterySweepWorker.kt`. Nothing
-else in that commit is new API surface.
-
----
 
 ## Blocked, not skipped
 

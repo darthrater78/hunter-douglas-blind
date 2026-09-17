@@ -5,6 +5,11 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 ### Changed
+- **The shades app bar's two text buttons became a `More` overflow menu.**
+  Three destinations (Actions, Raw scan, Settings) do not fit as three labels
+  on a phone's app bar. The trigger is a word rather than an icon because the
+  project pulls in no icon dependency — the same reason the action editor names
+  its icon choices instead of drawing them.
 - **`ActionRunner` and `ActionResult` move from `:widget` to `:data`.** The
   runner is a GATT-backed domain service over `:ble`, not a home-screen
   surface — `BatteryReader` is the existing precedent for exactly that shape in
@@ -50,6 +55,37 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
+- **A theme picker, with an OLED black option.** Settings (app bar → More →
+  Settings) offers Follow system / Light / Dark / Black (OLED), persisted in a
+  new `SettingsStore`. The app previously used bare `MaterialTheme`, i.e.
+  whatever the system said, with no way to choose.
+
+  Light and dark stay on Material 3's baseline palette deliberately — the app
+  has no brand colours, and inventing some in the change that adds a picker
+  would mean every screen changed appearance for reasons unrelated to the
+  setting the user just touched.
+
+  The OLED scheme is the dark scheme with the background/surface family pulled
+  to black, and two details in it are the difference between an OLED theme and
+  an unreadable one. The containers are *not* black: Material draws cards,
+  sheets and the app bar from the `surfaceContainer` roles, and a black card on
+  a black background is an invisible card, so the background is a true
+  `0xFF000000` — which is what actually switches OLED pixels off, and where
+  most of a screen's area is — while the containers sit on a near-black ramp
+  just bright enough to read as edges. And `surfaceTint` is black, because
+  Material blends the tint into a surface in proportion to its elevation, so a
+  nominally black elevated surface would otherwise come out grey and the theme
+  would quietly fail at exactly the components it most needs to work on.
+
+  OLED does not follow the system light/dark setting. Someone who picks it has
+  asked for black, and going light during the day would be a different theme
+  than the one they chose; `Follow system` already exists for that.
+
+  `values-night/themes.xml` gives the window a black background so a cold start
+  does not flash AppCompat's mid-grey before Compose draws. That applies to
+  both dark themes, since a resource qualifier can only see the system's night
+  setting and not the app's own `ThemeMode` — harmless, because the standard
+  dark scheme's surfaces are nearly that dark anyway.
 - **Saved actions are reachable**: a list screen that runs, edits and deletes
   them, and an editor. Gen 3 shades have no on-shade scenes, so a `ShadeAction`
   *is* the scene (spec §3.1), and widgets, the tile and shortcuts will all

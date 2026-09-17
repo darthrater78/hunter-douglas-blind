@@ -1,11 +1,11 @@
 # Dev Skills gate state
 Track: work commits (no version bump, no artifact publish, no release)
 Version: n/a — still pre-release, nothing tagged
-Updated: 2026-09-17
+Updated: 2026-09-17 (session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ CI green through `1a99a41`; `3fe7a27` pending — see notes
-🔒 SECURITY   ⚠️ last full audit predates this session's code — see notes
+🔨 BUILD      ✅ CI green through `0113457` (run #14); theme commit pending CI
+🔒 SECURITY   ✅ theme diff scanned, 0 Critical / 0 High — but see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
 📦 RELEASE    ⬜ no PR open
 🚀 SHIP       ⬜ nothing tagged or released
@@ -22,15 +22,12 @@ how to verify pure-Kotlin code locally without an Android SDK, and what is
 blocked rather than skipped.
 
 ## Build gate notes
-CI is green on `1a99674`, `9e7760c`, `dac12fe` and `1a99a41`, each through
-`assembleRelease` with R8 (which is where `lintVitalRelease` runs).
+**Resolved: the battery sweep compiles.** CI run #14 on `0113457` — the branch
+head, carrying the same sweep code as `3fe7a27` — finished green, through
+`assembleRelease` with R8. The previous session's open question is closed; no
+commit on this branch is now unverified by a compiler.
 
-**The weekly battery sweep (`3fe7a27`) was pushed at the end of the session and
-its run was still in flight.** Confirm it before building on top of it — but
-check the run for `e0d459b`, the newest commit, not for `3fe7a27`: CI cancels
-in-progress runs per ref, so the sweep's own run was almost certainly cancelled
-by the following push. A cancelled run is not a failure, and `e0d459b` covers
-the same code.
+Everything from `9e7760c` onward is green.
 
 The Android modules still cannot be compiled in this container (no SDK; Google
 Maven unreachable). What *can* be checked locally has grown, and is worth using:
@@ -39,9 +36,18 @@ Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
 compile error before CI this session.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 35 in `:ui`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 42 in `:ui`.
 
 ## Security gate notes
+**This session's theme work is scanned and clean** (0 Critical / 0 High). It
+adds no dependency, no permission, no network or crypto surface, no logging and
+no exported component; the one new persisted value is a theme name in its own
+`app_settings` DataStore, which falls back to `SYSTEM` on an unrecognised
+value rather than throwing. It is deliberately a separate DataStore from the
+shade and action stores so a corrupt settings blob costs a theme choice rather
+than a shade list. Backup rules need no change — the denylist excludes only
+`shade_keystreams.xml`, and a theme preference is right to restore.
+
 The full audit (1 Critical, 5 High, 11 Medium, 4 Low; all Critical and High
 fixed) was run last session and covers the code as it stood then. **This session
 added roughly 2,000 lines — five new UI screens, two view models, a notification

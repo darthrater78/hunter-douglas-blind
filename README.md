@@ -24,6 +24,12 @@ implemented and unit-tested against real sniffed test vectors — see
 follows the build order below; see each module's TODOs for exactly what's
 next.
 
+Appearance is a setting rather than a build-order step: app bar → More →
+Settings offers Follow system / Light / Dark / **Black (OLED)**, the last of
+which uses true-black backgrounds so an OLED panel can switch those pixels
+off. Light and dark are Material 3's baseline palettes — the app has no brand
+colours yet.
+
 ## Module map
 
 ```
