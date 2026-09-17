@@ -41,7 +41,7 @@ Build order progress (numbering follows the README):
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
 | 9 Glance widgets | ✅ widget, grid, config activity, per-instance state |
 | 10 Battery sweep + notifications | ✅ weekly sweep, one summary notification |
-| 11 Quick Settings tile + shortcuts | ◐ tile done; shortcuts **next** |
+| 11 Quick Settings tile + shortcuts | ✅ tile, and four dynamic shortcuts |
 | 12 Home Assistant bridge | ⬜ optional |
 
 Appearance is not a build-order step. A theme picker (Follow system / Light /
@@ -208,7 +208,7 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## Next step: shortcuts, then step 6 — with step 5 still last
+## Next step: step 5 — everything else is done
 
 **Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
 that when this session offered to start it. An earlier version of this
@@ -216,17 +216,21 @@ document recommended pulling it forward; that recommendation is withdrawn, and
 the reasoning is kept below only because the decision it records is still open
 and will still be needed when step 5's turn comes.
 
-So the work in front of you is **the rest of step 11: launcher shortcuts**.
-The tile landed; shortcuts did not. What they need is a transparent
-trampoline activity that reads an action id from its intent, calls
-`CommandDispatch.enqueue` and finishes, plus dynamic shortcuts published
-whenever the action list changes. The awkward part is deciding *when* to
-republish them, since nothing currently observes `ActionStore` outside a
-screen.
+**Step 5 is now the only thing left**, and step 6 comes with it rather than
+before it. That is not a scheduling preference: step 6's one remaining
+deliverable is the guided derive-from-capture flow, which *is* keystream
+onboarding — it ends in a keystream in `EncryptedSharedPreferences`, the same
+spine step 5 introduces. Building it separately would be building step 5
+under another number. The rest of step 6 is already done and was before this
+session: `CommandQueue` is owned by `ShadeGattClient`, and tilt and secondary
+have controls on the detail screen and rows in the action editor.
 
-After that, step 6 (the guided derive-from-capture UI) is the last thing
-before step 5, and it is really part of keystream onboarding, so it may be
-worth taking together with it.
+The one genuinely open piece of step 6 is **persisting the sequence
+counter**, and it cannot be settled here. `ActionRunner` keeps an in-memory
+per-shade counter that resets on process death; whether that matters depends
+on whether the shade validates sequence monotonicity as replay protection,
+which no one has observed. It is a `docs/PROTOCOL.md` §8 question, answerable
+the first time a real write lands — which is step 5.
 
 ### The step 5 decision, when its turn comes
 

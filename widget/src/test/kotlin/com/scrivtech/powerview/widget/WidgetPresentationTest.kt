@@ -1,6 +1,7 @@
 package com.scrivtech.powerview.widget
 
 import com.scrivtech.powerview.data.ActionIcon
+import com.scrivtech.powerview.data.Command
 import com.scrivtech.powerview.data.ShadeAction
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -222,5 +223,61 @@ class TilePresentationTest {
                 }
             }
         }
+    }
+}
+
+class ShortcutActionsTest {
+
+    private fun action(id: String, label: String, commands: Int = 1) = ShadeAction(
+        id = id,
+        label = label,
+        icon = ActionIcon.CUSTOM,
+        commands = (1..commands).map { Command(macAddress = "AA:BB:CC:DD:EE:0$it") },
+    )
+
+    @Test
+    fun `actions that would move nothing are dropped`() {
+        // A launcher shortcut that does nothing is indistinguishable from a
+        // broken one, and the editor can produce a zero-command action.
+        val kept = shortcutActions(listOf(action("a", "Empty", commands = 0), action("b", "Real")))
+        assertEquals(listOf("b"), kept.map { it.id })
+    }
+
+    @Test
+    fun `blank labels are dropped rather than shown as an unnamed row`() {
+        val kept = shortcutActions(listOf(action("a", "   "), action("b", "Named")))
+        assertEquals(listOf("b"), kept.map { it.id })
+    }
+
+    @Test
+    fun `order is alphabetical and case-insensitive`() {
+        val kept = shortcutActions(
+            listOf(action("a", "zebra"), action("b", "Apple"), action("c", "mango")),
+        )
+        assertEquals(listOf("Apple", "mango", "zebra"), kept.map { it.label })
+    }
+
+    @Test
+    fun `the cap is applied after filtering, not before`() {
+        // Otherwise a few empty actions sorting early would silently eat the
+        // shortcut slots of real ones.
+        val actions = (1..3).map { action("empty$it", "AAA empty $it", commands = 0) } +
+            (1..3).map { action("real$it", "Real $it") }
+
+        val kept = shortcutActions(actions, max = 2)
+        assertEquals(listOf("real1", "real2"), kept.map { it.id })
+    }
+
+    @Test
+    fun `a zero or negative cap yields nothing rather than throwing`() {
+        // getMaxShortcutCountPerActivity is a system value; do not assume it
+        // is sane.
+        assertEquals(emptyList<ShadeAction>(), shortcutActions(listOf(action("a", "A")), max = 0))
+        assertEquals(emptyList<ShadeAction>(), shortcutActions(listOf(action("a", "A")), max = -1))
+    }
+
+    @Test
+    fun `no actions means no shortcuts`() {
+        assertEquals(emptyList<ShadeAction>(), shortcutActions(emptyList()))
     }
 }

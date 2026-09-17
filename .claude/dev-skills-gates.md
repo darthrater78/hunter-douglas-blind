@@ -4,7 +4,7 @@ Version: n/a — still pre-release, nothing tagged
 Updated: 2026-09-17 (session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ CI green through `9193ad2` (run #18, incl. R8); tile pending CI
+🔨 BUILD      ✅ CI green through `7add46c` (run #21, incl. R8); shortcuts pending
 🔒 SECURITY   ✅ theme/widget/tile diffs scanned, 0 Critical / 0 High — see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
 📦 RELEASE    ⬜ no PR open
@@ -22,9 +22,10 @@ how to verify pure-Kotlin code locally without an Android SDK, and what is
 blocked rather than skipped.
 
 ## Build gate notes
-**Green through `9193ad2`** (run #18), including `assembleRelease` with R8.
-That covers the theme picker (run #17) and the whole Glance widget, both of
-which were written without an Android SDK to compile against.
+**Green through `7add46c`** (run #21), including `assembleRelease` with R8 on
+every commit. That covers the theme picker (#17), the whole Glance widget
+(#18), the Quick Settings tile (#20) and the lock-screen change (#21) — all
+written without an Android SDK to compile against, and none of them red.
 
 The previous session's open question is closed too: run #14 on `0113457`
 carried the same battery-sweep code as `3fe7a27` and passed, so no commit on
@@ -43,13 +44,21 @@ Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
 compile error before CI this session.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 23 in `:widget`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 29 in `:widget`.
 
 ## Security gate notes
 **This session's work is scanned and clean** (0 Critical / 0 High).
 
 The widget (step 9) and tile (step 11) add **three exported components**,
 which is the thing here most worth a reviewer's attention.
+
+Launcher shortcuts add a fourth component, `RunActionActivity`, and it is
+**not** exported — verified against AOSP rather than assumed. The system
+starts a shortcut's intent under the publishing app's identity, not the
+launcher's (`LauncherAppsService.startShortcutInner`: "Note the target
+activity doesn't have to be exported"), so the trampoline is reachable that
+way and no other. Exporting it by reflex would have let any installed app
+move the shades by firing an intent with an action id.
 
 The tile's `<service>` is bound behind `android.permission.BIND_QUICK_SETTINGS_TILE`,
 so only the system can reach it despite being exported. Its `PendingIntent`

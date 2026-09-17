@@ -197,3 +197,34 @@ internal fun tileSubtitle(hasAction: Boolean, run: SlotRun, locked: Boolean): St
  */
 internal fun tileLabel(actionLabel: String?, locked: Boolean): String =
     if (locked || actionLabel.isNullOrBlank()) TILE_UNCONFIGURED_LABEL else actionLabel
+
+// --- Launcher shortcuts (build order step 11) ------------------------------
+
+/**
+ * How many actions get a launcher shortcut.
+ *
+ * Launchers commonly show four or five before scrolling, and the system's own
+ * cap is queried separately and applied on top of this — this is the number
+ * that keeps a long-press menu usable, not a platform limit.
+ */
+internal const val MAX_SHORTCUTS: Int = 4
+
+/**
+ * Which actions become shortcuts, in the order they should appear.
+ *
+ * Actions with no commands are dropped rather than shown: the editor already
+ * discards shades with nothing enabled, so a zero-command action is one that
+ * would connect to nothing and move nothing, and a launcher shortcut that
+ * does nothing is indistinguishable from a broken one.
+ *
+ * Alphabetical, because there is no usage data to rank by and an arbitrary
+ * order would shuffle under the user's thumb as actions are added.
+ */
+internal fun shortcutActions(actions: List<ShadeAction>, max: Int = MAX_SHORTCUTS): List<ShadeAction> =
+    actions
+        .filter { it.label.isNotBlank() && it.commands.isNotEmpty() }
+        .sortedBy { it.label.lowercase() }
+        .take(max.coerceAtLeast(0))
+
+/** Shown when a launcher shortcut starts an action; see `RunActionActivity`. */
+internal const val SHORTCUT_STARTED_TEXT: String = "Sending…"

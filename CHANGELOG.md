@@ -55,10 +55,40 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
-- **The Quick Settings tile (build order step 11, in part).** One designated
+- **Launcher shortcuts, completing build order step 11.** Long-press the app
+  icon to run a saved action without opening the app. Up to four, alphabetical
+  — there is no usage data to rank by, and an arbitrary order would shuffle
+  under the user's thumb as actions are added.
+
+  Republished whenever the action list changes rather than once at startup: a
+  shortcut is a *copy* of the label, so a renamed action would otherwise carry
+  its old name on the launcher until the next cold start. The shortcut id is
+  the action id, which is what keeps a pinned shortcut pointing at the right
+  action across that rename. The collector lives in `PowerViewApplication`
+  because it is the one collector that has to outlive every screen.
+
+  **`RunActionActivity` is not exported, and does not need to be.** The system
+  starts a shortcut's intent under the publishing app's identity, not the
+  launcher's — AOSP's `LauncherAppsService.startShortcutInner` states it in as
+  many words. So the trampoline has no untrusted-input surface at all.
+  Exporting it by reflex, which is the easy mistake here, would have let any
+  installed app move the shades.
+
+  Actions with no commands, or a blank label, get no shortcut: the editor can
+  produce a zero-command action, and a launcher shortcut that does nothing is
+  indistinguishable from a broken one. The cap is applied after that filter,
+  so empty actions sorting early cannot eat the slots of real ones.
+
+  A shortcut tap raises a "Sending…" toast — the only surface here with
+  nowhere of its own to report, so without it the tap is silent and
+  indistinguishable from one that did not work. "Sending" is the honest tense:
+  the outcome lands seconds later on the widget or tile if one exists, and in
+  the app either way.
+
+- **The Quick Settings tile (build order step 11).** One designated
   `ShadeAction`, run through the same `CommandDispatch` call a widget tap
   uses, so the tile is a second button on one funnel rather than a second
-  path to BLE. Shortcuts, the other half of step 11, are not built yet.
+  path to BLE.
 
   **Which action it runs is chosen in the app's settings, not on the tile.** A
   tile is one button with nowhere to put a picker, unlike a widget, which gets

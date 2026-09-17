@@ -64,5 +64,27 @@
             </intent-filter>
         </service>
 
+        <!--
+          Launcher-shortcut trampoline. NOT exported, and it does not need to
+          be: the system starts a shortcut's intent under the publishing
+          app's identity, not the launcher's, so a non-exported activity is
+          reachable this way and no other. AOSP's
+          LauncherAppsService.startShortcutInner states it outright ("Note
+          the target activity doesn't have to be exported"). Exporting it
+          would let any installed app move the shades.
+
+          Translucent rather than Theme.NoDisplay: it finishes in onCreate so
+          either would do, but NoDisplay crashes outright if an activity ever
+          reaches onResume, and that is a sharp edge to leave for whoever
+          edits this next.
+        -->
+        <activity
+            android:name="com.scrivtech.powerview.widget.RunActionActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
     </application>
 </manifest>

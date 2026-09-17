@@ -11,9 +11,11 @@ import com.scrivtech.powerview.data.KeystreamStore
 import com.scrivtech.powerview.data.SettingsStore
 import com.scrivtech.powerview.data.ShadeRepository
 import com.scrivtech.powerview.data.ShadeStore
+import com.scrivtech.powerview.widget.ActionShortcuts
 import com.scrivtech.powerview.widget.CommandWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Wires up the singletons every screen/worker/widget shares. No DI framework
@@ -45,6 +47,16 @@ public class PowerViewApplication : Application(), Configuration.Provider {
         // Safe on every launch: the schedule is KEEP, so an existing weekly
         // sweep is left running rather than having its interval restarted.
         BatterySweepWorker.ensureScheduled(this)
+
+        // Launcher shortcuts are a copy of each action's label, so they are
+        // republished whenever the list changes rather than once here -- a
+        // renamed action would otherwise keep its old name on the launcher
+        // until the next cold start. This is the only collector in the app
+        // that has to outlive every screen, which is why it is started from
+        // the Application rather than a view model.
+        applicationScope.launch {
+            actionStore.actions.collect { actions -> ActionShortcuts.publish(this@PowerViewApplication, actions) }
+        }
     }
 
     override val workManagerConfiguration: Configuration
