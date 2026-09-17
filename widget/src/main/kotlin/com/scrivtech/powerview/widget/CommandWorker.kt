@@ -13,14 +13,16 @@ import kotlinx.coroutines.flow.first
 
 /**
  * Runs one [com.scrivtech.powerview.data.ShadeAction] via [ActionRunner], per
- * the execution path in spec §3.3. Expedited, one-shot `WorkManager` work —
- * enqueued by the (not-yet-built, build order step 9) Glance widget click
- * callback, and by any other command surface once it exists.
+ * the execution path in spec §3.3. One-shot `WorkManager` work, enqueued
+ * through [CommandDispatch] by the Glance widget's tap callback and by any
+ * other command surface.
  *
- * TODO(build order step 9): start a foreground service
- * (`foregroundServiceType="connectedDevice"`) here if the action will run
- * more than a moment — required for reliable execution when the app has been
- * backgrounded for a while, per spec §3.3 step 2.
+ * See [CommandDispatch] for why this is *not* expedited work, and what would
+ * have to be declared before it could be.
+ *
+ * Reporting the outcome is part of the job, not an extra: a widget button or
+ * a tile left showing "Sending…" forever is worse than one that says it
+ * failed, so every terminal path here goes through [finish].
  */
 public class CommandWorker(
     context: Context,
@@ -30,17 +32,53 @@ public class CommandWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
+        // No action id means nothing to report against, so there is no widget
+        // state to settle either — this is the one path that does not finish().
         val actionId = inputData.getString(KEY_ACTION_ID) ?: return Result.failure()
+
         val action = actionStore.actions.first().firstOrNull { it.id == actionId }
-            ?: return Result.failure(workDataOf(KEY_ERROR to "unknown action id: $actionId"))
+            ?: return finish(
+                actionId = actionId,
+                succeeded = false,
+                result = Result.failure(workDataOf(KEY_ERROR to "unknown action id: $actionId")),
+            )
 
         return when (val outcome = actionRunner.run(action)) {
-            ActionResult.Success -> Result.success()
-            is ActionResult.Failed -> Result.failure(
-                workDataOf(KEY_FAILED_MACS to outcome.failedMacAddresses.toTypedArray()),
+            ActionResult.Success -> finish(actionId, succeeded = true, result = Result.success())
+
+            is ActionResult.Failed -> finish(
+                actionId = actionId,
+                succeeded = false,
+                result = Result.failure(
+                    workDataOf(KEY_FAILED_MACS to outcome.failedMacAddresses.toTypedArray()),
+                ),
             )
-            ActionResult.Pending -> Result.retry() // should not be observed as a terminal state from ActionRunner.run
+
+            // Should not be observed as a terminal state from ActionRunner.run.
+            // Left pending on purpose: a retry is still in flight, and marking
+            // the widget idle or failed now would contradict the next attempt.
+            ActionResult.Pending -> Result.retry()
         }
+    }
+
+    /**
+     * Settles the widgets showing this action, then returns [result].
+     *
+     * A success clears back to [SlotRun.IDLE] rather than showing a tick: the
+     * widget cannot verify that the shade actually moved — only that the frame
+     * was acknowledged — and a confirmation mark would claim more than
+     * `ActionRunner` knows. The in-app screens carry that nuance in words.
+     */
+    private suspend fun finish(actionId: String, succeeded: Boolean, result: Result): Result {
+        val run = if (succeeded) SlotRun.IDLE else SlotRun.FAILED
+
+        // Every surface that can show this action, not just the one that
+        // started it: a tile tap and a widget tap run the same action, and
+        // whichever one the user looks at next should be telling the truth.
+        WidgetStatus.mark(context = applicationContext, actionId = actionId, run = run)
+        QuickSettingsTile.report(context = applicationContext, actionId = actionId, run = run)
+
+        return result
     }
 
     public companion object {
@@ -56,8 +94,9 @@ public class CommandWorker(
      * has no no-arg constructor for the default `WorkManager` factory to use.
      * Register an instance of this via
      * `Configuration.Builder().setWorkerFactory(...)` in the Application's
-     * `WorkManager` configuration — wiring deferred to `:app`, build order
-     * step 9.
+     * `WorkManager` configuration — `PowerViewApplication` does this. Note
+     * that WorkManager's automatic initializer must stay removed in the
+     * manifest for that registration to be seen at all.
      */
     public class Factory(
         private val actionStore: ActionStore,
