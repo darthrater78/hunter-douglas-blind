@@ -4,8 +4,8 @@ Version: n/a — still pre-release, nothing tagged
 Updated: 2026-09-17 (session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ CI green through `0113457`; theme + widget commits pending CI
-🔒 SECURITY   ✅ theme + widget diffs scanned, 0 Critical / 0 High — see notes
+🔨 BUILD      ✅ CI green through `9193ad2` (run #18, incl. R8); tile pending CI
+🔒 SECURITY   ✅ theme/widget/tile diffs scanned, 0 Critical / 0 High — see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
 📦 RELEASE    ⬜ no PR open
 🚀 SHIP       ⬜ nothing tagged or released
@@ -22,12 +22,19 @@ how to verify pure-Kotlin code locally without an Android SDK, and what is
 blocked rather than skipped.
 
 ## Build gate notes
-**Resolved: the battery sweep compiles.** CI run #14 on `0113457` — the branch
-head, carrying the same sweep code as `3fe7a27` — finished green, through
-`assembleRelease` with R8. The previous session's open question is closed; no
-commit on this branch is now unverified by a compiler.
+**Green through `9193ad2`** (run #18), including `assembleRelease` with R8.
+That covers the theme picker (run #17) and the whole Glance widget, both of
+which were written without an Android SDK to compile against.
 
-Everything from `9e7760c` onward is green.
+The previous session's open question is closed too: run #14 on `0113457`
+carried the same battery-sweep code as `3fe7a27` and passed, so no commit on
+this branch is unverified by a compiler.
+
+**What made the blind Glance commit compile first try** is worth repeating:
+every Glance signature was read from the AndroidX sources on GitHub
+(`raw.githubusercontent.com/androidx/androidx/androidx-main/glance/...`, which
+is reachable here even though Google Maven is not) rather than recalled. One
+fetch per signature beats one CI round trip per guess.
 
 The Android modules still cannot be compiled in this container (no SDK; Google
 Maven unreachable). What *can* be checked locally has grown, and is worth using:
@@ -36,13 +43,26 @@ Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
 compile error before CI this session.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 42 in `:ui`, 17 in `:widget`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 20 in `:widget`.
 
 ## Security gate notes
 **This session's work is scanned and clean** (0 Critical / 0 High).
 
-The widget (step 9) adds **two exported components**, which is the one thing
-here worth a reviewer's attention. Both have to be exported — a widget
+The widget (step 9) and tile (step 11) add **three exported components**,
+which is the thing here most worth a reviewer's attention.
+
+The tile's `<service>` is bound behind `android.permission.BIND_QUICK_SETTINGS_TILE`,
+so only the system can reach it despite being exported. Its `PendingIntent`
+(the API 34+ `startActivityAndCollapse` path) is `FLAG_IMMUTABLE`.
+
+**Accepted, not overlooked: the tile runs from the lock screen.** That is the
+point of a tile and what the spec asks for, but it means whoever holds the
+locked phone can move the shades that one action targets. It cannot read
+state, reveal anything, or reach the rest of the app. `unlockAndRun` is the
+mitigation if the user wants it; it is recorded in the README's security
+notes rather than decided unilaterally here.
+
+The two widget components: Both have to be exported — a widget
 receiver that is not exported never receives `APPWIDGET_UPDATE`, and the
 launcher is what starts a configuration activity — so the question is what
 they accept. The receiver acts only on widget ids the system hands it. The

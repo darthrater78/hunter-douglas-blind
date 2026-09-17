@@ -41,7 +41,7 @@ Build order progress (numbering follows the README):
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
 | 9 Glance widgets | ✅ widget, grid, config activity, per-instance state |
 | 10 Battery sweep + notifications | ✅ weekly sweep, one summary notification |
-| 11 Quick Settings tile | ⬜ TODO stub only — **next** |
+| 11 Quick Settings tile + shortcuts | ◐ tile done; shortcuts **next** |
 | 12 Home Assistant bridge | ⬜ optional |
 
 Appearance is not a build-order step. A theme picker (Follow system / Light /
@@ -51,6 +51,16 @@ why the OLED scheme's containers are not themselves black.
 ---
 
 ## What changed in the second session
+
+**Step 9 (the Glance widget) and most of step 11 (the Quick Settings tile).**
+Both were written blind and both compiled first try, including through R8.
+
+**The Quick Settings tile.** One designated action, run through the widget's
+`CommandDispatch`. Its action is chosen in the app's settings because a tile
+has nowhere to put a picker, and its last-run state is in memory on purpose —
+there is one tile, so one value, and after a process death "last run failed"
+is stale news nobody can act on from a tile. It is reachable from the lock
+screen by design; the README's security notes say what that exposes.
 
 **Step 9, the Glance widget.** One to six buttons per widget instance, a
 configuration activity to choose which saved actions they run, and results
@@ -194,7 +204,7 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## Next step: step 11, with step 5 still last
+## Next step: shortcuts, then step 6 — with step 5 still last
 
 **Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
 that when this session offered to start it. An earlier version of this
@@ -202,12 +212,13 @@ document recommended pulling it forward; that recommendation is withdrawn, and
 the reasoning is kept below only because the decision it records is still open
 and will still be needed when step 5's turn comes.
 
-So the work in front of you is **step 11: the Quick Settings tile and
-shortcuts**. `QuickSettingsTile.kt` is still a placeholder object, and most of
-what it needs now exists: `CommandDispatch.enqueue` is the one call that turns
-a tap into work, and the widget already drives it. The open design question is
-where the tile's *designated* action comes from — it has only one button, and
-nothing yet records which action it runs.
+So the work in front of you is **the rest of step 11: launcher shortcuts**.
+The tile landed; shortcuts did not. What they need is a transparent
+trampoline activity that reads an action id from its intent, calls
+`CommandDispatch.enqueue` and finishes, plus dynamic shortcuts published
+whenever the action list changes. The awkward part is deciding *when* to
+republish them, since nothing currently observes `ActionStore` outside a
+screen.
 
 After that, step 6 (the guided derive-from-capture UI) is the last thing
 before step 5, and it is really part of keystream onboarding, so it may be
@@ -279,8 +290,9 @@ and the outcome-wording functions live in `ShadeFormatting.kt` rather than
 inside the Compose files that use them.
 
 Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
-(`ActionResultTest`), 42 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
-`ThemeSelectionTest` 7), 17 in `:widget` (`WidgetPresentationTest`).
+(`ActionResultTest`), 44 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
+`ThemeSelectionTest` 7, `TileActionDescriptionTest` 2), 20 in `:widget`
+(`WidgetPresentationTest` 17, `TilePresentationTest` 3).
 
 Also verifiable locally: workflow files with `actionlint`.
 

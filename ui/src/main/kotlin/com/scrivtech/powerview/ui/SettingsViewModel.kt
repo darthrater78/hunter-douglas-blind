@@ -39,6 +39,19 @@ public class SettingsViewModel(
         viewModelScope.launch { settingsStore.setThemeMode(mode) }
     }
 
+    /**
+     * Which action the Quick Settings tile runs, or null for none.
+     *
+     * `WhileSubscribed` unlike [themeMode]: nothing outside the settings
+     * screen reads this, so there is no wrong-value flash to avoid.
+     */
+    public val tileActionId: StateFlow<String?> = settingsStore.tileActionId
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000), null)
+
+    public fun setTileActionId(actionId: String?) {
+        viewModelScope.launch { settingsStore.setTileActionId(actionId) }
+    }
+
     public class Factory(
         private val settingsStore: SettingsStore,
     ) : ViewModelProvider.Factory {

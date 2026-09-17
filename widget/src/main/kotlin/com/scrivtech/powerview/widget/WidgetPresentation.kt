@@ -154,3 +154,29 @@ internal fun slotStatus(run: SlotRun): String? = when (run) {
 /** True when a tap on this slot should do nothing. */
 internal fun isSlotEnabled(slot: WidgetSlot, action: ShadeAction?): Boolean =
     action != null && slot.run != SlotRun.PENDING
+
+// --- Quick Settings tile (build order step 11) -----------------------------
+//
+// The tile shares this file rather than having its own because it shares the
+// vocabulary: one action, one run state, the same three outcomes. What it
+// does not share is the widget's per-instance storage — a tile is a
+// singleton, so its run state is held in memory and the wording below is the
+// only part worth testing.
+
+/** Shown as the tile's label when it has no action to name. */
+internal const val TILE_UNCONFIGURED_LABEL: String = "PowerView"
+
+/**
+ * The tile's second line (API 29+).
+ *
+ * [hasAction] is false both when nothing has been chosen and when the chosen
+ * action has since been deleted. Those are the same thing from the tile's
+ * point of view — there is nothing to run — and the fix for both is the same
+ * trip into the app, so they read the same.
+ */
+internal fun tileSubtitle(hasAction: Boolean, run: SlotRun): String = when {
+    !hasAction -> "Choose an action in the app"
+    run == SlotRun.PENDING -> "Sending…"
+    run == SlotRun.FAILED -> "Last run failed"
+    else -> "Tap to run"
+}

@@ -44,5 +44,25 @@
             </intent-filter>
         </activity>
 
+        <!--
+          Quick Settings tile (build order step 11). The BIND_QUICK_SETTINGS_TILE
+          permission is what makes exporting this safe: it restricts binding to
+          the system, so "exported" here does not mean reachable by other apps.
+
+          TODO: android:icon is a framework placeholder, like the launcher icon
+          in :app. A tile icon wants a monochrome vector sized for the QS grid;
+          replace both together when the app gets a real icon set.
+        -->
+        <service
+            android:name="com.scrivtech.powerview.widget.QuickSettingsTile"
+            android:exported="true"
+            android:icon="@android:drawable/ic_menu_sort_by_size"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
     </application>
 </manifest>

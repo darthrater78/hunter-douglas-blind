@@ -40,8 +40,8 @@ colours yet.
 :ui         Android/Compose — shade list, per-shade detail, actions list/editor,
             settings (theme), and the build-order-step-2 debug screen as one route
 :widget     Android — home-screen command surfaces: the Glance widget, its
-            configuration activity and CommandWorker. The Quick Settings tile is
-            still a TODO stub (build order step 11)
+            configuration activity, the Quick Settings tile and CommandWorker.
+            Shortcuts (the rest of build order step 11) are not built yet
 :app        Android application — manifest/permissions, MainActivity, DI wiring
 ```
 
@@ -61,7 +61,7 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 8. ✅ `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Per-rail sliders on the shade detail screen call `ActionRunner` directly. Nothing can succeed until step 5 supplies a keystream — the controls say so rather than failing opaquely.)
 9. ✅ Glance widgets: 1×1 and the grid, with a configuration activity and pending/failed states. (`ShadeActionWidget` + `ShadeActionWidgetReceiver`, `WidgetConfigActivity`, `WidgetStatus`, `CommandDispatch`. State is per widget *instance*, so two widgets pointing at the same action do not share a spinner. Not expedited work — see `CommandDispatch` for why that would crash below API 31.)
 10. ✅ Battery sweep worker and low-battery notifications. (`BatterySweepWorker`, weekly, skips mains-powered shades; `BatteryNotifier` posts one summary notification at or below `LOW_BATTERY_PERCENT`.)
-11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`. `CommandDispatch` is the call it needs; the widget already uses it.)
+11. ◐ Quick Settings tile done; **shortcuts still TODO**. (`QuickSettingsTile` runs one designated action through the same `CommandDispatch` call the widget uses. Which action it runs is chosen in the app's settings, because a tile has one button and nowhere to put a picker. Reachable from the lock screen — see "Security notes".)
 12. Optional: Home Assistant bridge via a Python port of `:protocol` + `bleak` + an ESPHome BLE proxy.
 
 ## Verifying `:protocol`
@@ -156,6 +156,14 @@ Generate a keystore with `keytool -genkeypair -keystore release.keystore
 the keystore — `.gitignore` already covers `*.keystore`/`*.jks`.
 
 ## Security notes
+
+**The Quick Settings tile works on the lock screen, by design.** That is what
+a tile is for, and it is how the spec asks for it — but it does mean anyone
+holding the locked phone can move the shades it points at. The tile cannot
+read anything, reveal a shade's state, or reach any other part of the app;
+the exposure is the one action it is set to. If that is not wanted, either
+leave the tile set to None or wrap `onClick` in `unlockAndRun`, which makes
+Android demand the lock screen first.
 
 - The write keystream (spec §1.4/§4) is stored via `EncryptedSharedPreferences`
   (Android Keystore-backed), separate from the plain shade metadata blob —

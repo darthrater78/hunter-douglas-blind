@@ -55,6 +55,33 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
+- **The Quick Settings tile (build order step 11, in part).** One designated
+  `ShadeAction`, run through the same `CommandDispatch` call a widget tap
+  uses, so the tile is a second button on one funnel rather than a second
+  path to BLE. Shortcuts, the other half of step 11, are not built yet.
+
+  **Which action it runs is chosen in the app's settings, not on the tile.** A
+  tile is one button with nowhere to put a picker, unlike a widget, which gets
+  a configuration activity when it is placed. The id is stored rather than the
+  action, so renaming or retargeting needs no reconfiguration — the same
+  contract widgets have.
+
+  **The last run's outcome is held in memory and deliberately not persisted.**
+  There is exactly one tile, so there is exactly one value, and it is worth
+  only as much as the process it was learned in: after the app has been
+  killed, "last run failed" is stale news the user cannot act on from a tile.
+  The app is the record, which is what the failure subtitle points at.
+
+  Exported, like any tile, but bound behind `BIND_QUICK_SETTINGS_TILE` so only
+  the system can reach it. It is reachable from the lock screen by design —
+  see the README's security notes for what that does and does not expose, and
+  how to turn it off.
+
+  `Tile.subtitle` is API 29, so it is guarded; below that the label carries
+  everything and nothing is lost. `startActivityAndCollapse` is branched on
+  API 34, where the `Intent` overload was replaced by a `PendingIntent` one
+  and now throws — the `PendingIntent` is `FLAG_IMMUTABLE`.
+
 - **The home-screen widget (build order step 9).** One to six buttons per
   widget, each running a saved `ShadeAction` through the same `ActionRunner`
   funnel as the in-app controls. `ShadeActionWidget` + its receiver,

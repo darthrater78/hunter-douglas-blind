@@ -22,6 +22,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 public class SettingsStore(private val context: Context) {
 
     private val themeModeKey = stringPreferencesKey("theme_mode")
+    private val tileActionIdKey = stringPreferencesKey("tile_action_id")
 
     /**
      * The chosen [ThemeMode], defaulting to [ThemeMode.SYSTEM].
@@ -39,5 +40,28 @@ public class SettingsStore(private val context: Context) {
 
     public suspend fun setThemeMode(mode: ThemeMode) {
         context.settingsDataStore.edit { prefs -> prefs[themeModeKey] = mode.name }
+    }
+
+    /**
+     * Which saved action the Quick Settings tile runs, or null for none.
+     *
+     * A tile has one button, so unlike a widget it cannot be configured
+     * in place — there is nowhere to put a picker. It is chosen in the app's
+     * settings instead, which is why this lives here rather than in
+     * `:widget`: `:ui` writes it and `:widget` reads it, and the two are
+     * peers that cannot see each other.
+     *
+     * The id is stored rather than the action itself, so renaming or
+     * retargeting an action updates the tile with no reconfiguration — the
+     * same contract widgets and shortcuts have.
+     */
+    public val tileActionId: Flow<String?> = context.settingsDataStore.data.map { prefs ->
+        prefs[tileActionIdKey]?.takeIf { it.isNotBlank() }
+    }
+
+    public suspend fun setTileActionId(actionId: String?) {
+        context.settingsDataStore.edit { prefs ->
+            if (actionId.isNullOrBlank()) prefs.remove(tileActionIdKey) else prefs[tileActionIdKey] = actionId
+        }
     }
 }

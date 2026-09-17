@@ -159,3 +159,35 @@ class WidgetPresentationTest {
         assertFalse(isSlotEnabled(WidgetSlot("a", SlotRun.IDLE), null))
     }
 }
+
+class TilePresentationTest {
+
+    @Test
+    fun `an unconfigured tile points at the app whatever the run state`() {
+        // A deleted action and a never-chosen one are the same thing here:
+        // nothing to run, and the same trip into the app to fix it.
+        for (run in SlotRun.entries) {
+            assertEquals(
+                "run=$run",
+                "Choose an action in the app",
+                tileSubtitle(hasAction = false, run = run),
+            )
+        }
+    }
+
+    @Test
+    fun `a configured tile reports its last run`() {
+        assertEquals("Tap to run", tileSubtitle(hasAction = true, run = SlotRun.IDLE))
+        assertEquals("Sending…", tileSubtitle(hasAction = true, run = SlotRun.PENDING))
+        assertEquals("Last run failed", tileSubtitle(hasAction = true, run = SlotRun.FAILED))
+    }
+
+    @Test
+    fun `every subtitle is non-blank`() {
+        for (hasAction in listOf(false, true)) {
+            for (run in SlotRun.entries) {
+                assertTrue(tileSubtitle(hasAction, run).isNotBlank())
+            }
+        }
+    }
+}

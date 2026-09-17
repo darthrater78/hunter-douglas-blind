@@ -45,6 +45,8 @@ public fun PowerViewApp(
     actionsViewModel: ActionsViewModel,
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit,
+    tileActionId: String?,
+    onTileActionChange: (String?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var route by rememberSaveable { mutableStateOf(ROUTE_SHADES) }
@@ -160,6 +162,9 @@ public fun PowerViewApp(
             ROUTE_SETTINGS -> SettingsScreen(
                 themeMode = themeMode,
                 onThemeModeChange = onThemeModeChange,
+                actions = actions,
+                tileActionId = tileActionId,
+                onTileActionChange = onTileActionChange,
                 modifier = content,
             )
 

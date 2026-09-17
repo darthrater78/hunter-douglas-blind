@@ -87,6 +87,7 @@ public class MainActivity : ComponentActivity() {
 
         setContent {
             val themeMode by settingsViewModel.themeMode.collectAsState()
+            val tileActionId by settingsViewModel.tileActionId.collectAsState()
 
             PowerViewTheme(mode = themeMode) {
                 Surface {
@@ -95,6 +96,8 @@ public class MainActivity : ComponentActivity() {
                         actionsViewModel = actionsViewModel,
                         themeMode = themeMode,
                         onThemeModeChange = settingsViewModel::setThemeMode,
+                        tileActionId = tileActionId,
+                        onTileActionChange = settingsViewModel::setTileActionId,
                     )
                 }
             }
