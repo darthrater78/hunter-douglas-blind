@@ -1,13 +1,10 @@
 # Handoff
 
-Written 2026-09-17, rewritten the same day at the end of a third session, and
-updated by a fourth that built the project locally for the first time.
-Branch `claude/load-dev-skills-d0bioe` — which is this repository's **default
-branch**, not a feature branch; there is no `main` or `master` and no tags at
-all — green in CI, with no release tagged. **The Dependabot queue is cleared:**
-six PRs merged, one closed as superseded, nothing open. Step 5 is now the only
-thing left; see "The dependency sweep" below for what the queue turned out to
-be hiding.
+Written 2026-09-17 at the end of the fourth session, which is the first to run
+on the owner's build server rather than the sandboxed Claude Code container.
+Branch `claude/load-dev-skills-d0bioe` is this repository's **default branch**
+(there is no `main` or `master`, and no tags). The head, `238fbb5`, is green in
+CI, including full lint. No release has been tagged.
 
 This is the state-of-play document for whoever picks the project up next. The
 README describes what the app is meant to be; this describes what is actually
@@ -20,40 +17,55 @@ true about it today, which is not the same thing.
 Two distinctions carry most of the useful information in this project.
 
 **Confirmed against real hardware versus assumed.** The scaffold was written
-without any shade present, so a lot of it was reasonable-but-unverified — and
+without any shade present, so a lot of it was reasonable-but-unverified, and
 two of those assumptions turned out to be wrong the first time a real device
 was in range. Keep that distinction alive as you work; it is why the debug
 screen still shows raw bytes next to decoded fields, and why the control
 sliders are labelled with percentages rather than "Open" and "Close".
 
 **Nothing in this app can move a shade yet.** The one remaining blocker is
-keystream onboarding (step 5), which is deliberately last — the user
-reconfirmed that ordering when this session offered to start it. Do not pull
-it forward; steps 9 and 11 are built around it, and step 6 is really part of
-onboarding anyway. The UI is built to say so
-out loud rather than failing opaquely — see "The no-keystream state" below.
+keystream onboarding (step 5), which is deliberately last; the user has
+reconfirmed that ordering more than once. Do not pull it forward. The UI says
+so out loud rather than failing opaquely; see "The no-keystream state" below.
 
-**One thing is waiting: step 5.** The Dependabot queue that used to sit in
-front of it is done, and the fourth session closed two of its follow-ups: the
-built-in Kotlin migration is taken, Dependabot alerts are on, five AndroidX
-lines that were behind are bumped, and full `lint` passes and gates CI, which
-exposed and fixed a scanning bug on Android 8–11. Still open, none blocking
-step 5: a visual check of the Compose BOM jump against the OLED theme, a device
-check of the widgets on the newer Glance/WorkManager, and a scan on an
-Android 8–11 device. All are under "The dependency sweep".
+**Where things stand:**
 
-**The project now builds locally.** The fourth session ran on a server with an
-Android SDK and ordinary network access, where
-`./gradlew :protocol:test assembleDebug test assembleRelease lint` passes. That makes
-a lot of "Verifying work without an Android SDK" below a fallback for the
-sandboxed container rather than the only option.
+- **Build-order work left:** step 5 (and the part of step 6 that is really
+  step 5).
+- **Dependencies and CI:** nothing open. No Dependabot PRs, every catalog line
+  current as of 2026-09-17, Dependabot alerts on with none reported, full lint
+  gating CI, every action SHA verified.
+- **Waiting on a phone:** three checks nothing on a server can do (below).
+- **Builds locally.** On the build server,
+  `./gradlew :protocol:test assembleDebug test assembleRelease lint` is exactly
+  what CI runs, and it passes.
+
+### Waiting on a phone
+
+Install the debug APK and check:
+
+1. **Themes after the Compose BOM jump.** 2024.12.01 → 2026.09.00 is close to
+   two years of Material 3 across 22 artifacts, and the OLED theme leans on the
+   `surfaceContainer` roles and `surfaceTint`. Look at the shade list, the
+   detail screen and settings under **Black (OLED)** and **Light**: container
+   backgrounds, and whether the OLED scheme's deliberately-not-black containers
+   still read as intended. It is its own commit (`7acf5b6`), so a revert is
+   cheap.
+2. **Widgets on Glance 1.2.0 and WorkManager 2.11.2.** Both were bumped in the
+   fourth session with no source changes. They carry both widgets, the tile and
+   the command funnel. Add a widget, run an action (expect "Setup not
+   finished"), and check the battery widget renders.
+3. **Scanning on an Android 8–11 device**, if one is available. The fourth
+   session fixed a bug that meant scanning could never have worked there (see
+   "What changed in the fourth session"). The fix compiles and passes lint; it
+   has not run. Expect a location permission prompt on first launch.
 
 Build order progress (numbering follows the README):
 
 | Step | State |
 |---|---|
-| 1 `:protocol` + unit tests | ✅ 40 tests |
-| 2 Scanner + raw debug screen | ✅ **offsets confirmed on real hardware** |
+| 1 `:protocol` + unit tests | ✅ 40 test cases |
+| 2 Scanner + raw debug screen | ✅ **offsets confirmed on real hardware**; API 26–30 scanning fixed but untried |
 | 3 Capability mapping + per-shade UI | ✅ detail screen offers only what a capability claims |
 | 4 GATT connect + battery read | ✅ **first real GATT connection worked** |
 | 5 Keystream import + first write | ⬜ **the only thing blocking real control** |
@@ -68,9 +80,127 @@ Build order progress (numbering follows the README):
 Two things that are not build-order steps landed in the second session and
 are easy to miss in that table: a **theme picker** (Follow system / Light /
 Dark / Black (OLED)) and a **battery widget** with a **configurable sweep
-interval**. The CHANGELOG carries the design reasoning for each — why the
-OLED scheme's containers are deliberately not black, and why the battery
-widget never connects to a shade.
+interval**. The CHANGELOG carries the design reasoning for each.
+
+---
+
+## What changed in the fourth session
+
+The first session with an Android SDK and Google Maven, so the first that could
+check things the earlier sessions had to infer. Seven commits, plus the owner's
+merge of PR #9:
+
+| Commit | What |
+|---|---|
+| `560e09e` | Docs corrected against what a local build and Google Maven showed |
+| `7a4c3e5` | Built-in Kotlin adopted; the AGP 9 opt-out removed |
+| `8decaad` | Android 8–11 scanning fixed, lint errors fixed, CI gated on full lint |
+| `9935a96` | Five AndroidX lines bumped that Dependabot never offered |
+| `cb0a090` | Docs for the above |
+| `af0c7a2` | PR #9, setup-gradle 4.4.3 → 6.3.0 (merged by the owner) |
+| `238fbb5` | setup-gradle kept on the open-source cache |
+
+**`560e09e` does not build on its own.** A failed command in a chained commit
+script skipped the Kotlin commit and pushed the docs commit first, which
+removes `kotlin-android` from the catalog while the modules still apply it.
+`7a4c3e5` was pushed straight after and says so. Only matters when bisecting.
+The lesson is in "Working conventions".
+
+### Scanning could never have worked on Android 8–11
+
+Found because full `./gradlew lint` was run for the first time. It had never
+passed and CI had it commented out, while `lintVitalRelease` (inside
+`assembleRelease`) stayed green, so nothing noticed.
+
+`ShadeScanner.hasScanPermission` checked `BLUETOOTH_SCAN`, which only exists
+from API 31, so on API 26–30 it always read as denied and `scan()` closed
+immediately. Fixing the check alone would not have been enough: below 31 a BLE
+scan also needs `ACCESS_FINE_LOCATION`, a runtime permission there, and
+`MainActivity` never requested it (its comment claimed the pre-31 permissions
+were all install-time). Without it a scan starts and silently returns nothing.
+
+- `ShadeScanner.scanPermission()` names the right permission per API level.
+- `MainActivity` requests `ACCESS_FINE_LOCATION` below 31. It was already
+  declared with `maxSdkVersion="30"`; nothing new is declared.
+- `stopScan` is always attempted on close (catching `SecurityException`), and
+  `scan()` carries `@SuppressLint("MissingPermission")` like `ShadeGattClient`,
+  because the permission lives in `:app`'s manifest where `:ble`'s lint cannot
+  see it.
+
+The other lint error was `QuickSettingsTile` calling the deprecated
+`startActivityAndCollapse(Intent)`, which it already only does below API 34;
+lint flags it regardless of the version branch, so it is suppressed with a
+comment. Lint **warnings** remain (`OldTargetApi` on targetSdk 35, `UseKtx`,
+`UnusedAttribute`, `ObsoleteSdkInt`); none gate CI.
+
+### Built-in Kotlin, and the line that makes it work
+
+The third session opted out of AGP 9's built-in Kotlin because it could not see
+which Kotlin that would compile with, and it has to match the Compose compiler
+plugin at `kotlin = 2.4.20`. AGP 9.4.0's POM depends on Kotlin 2.2.10, but the
+root build file's `alias(libs.plugins.kotlin.jvm) apply false` puts
+kotlin-gradle-plugin 2.4.20 on the shared build classpath, and
+`./gradlew :ui:buildEnvironment` confirms 2.4.20 resolves. So `kotlin-android`
+is gone from the five Android modules, the root build file and the catalog, and
+`android.builtInKotlin` / `android.newDsl` are gone from `gradle.properties`.
+Nothing Kotlin-related blocks AGP 10.
+
+**That root `kotlin.jvm` line is load-bearing for every module.** Removing it
+was tried: the build does not configure at all ("already on the classpath with
+an unknown version"). The build file says so. When bumping `kotlin`, the
+Compose plugin moves with it through the same catalog entry.
+
+### Dependencies: an empty queue did not mean current
+
+The third session concluded everything was current once the Dependabot queue
+was empty. Checked against Google Maven directly, five AndroidX lines were
+behind with no PR offering them, and are now bumped (no source changes):
+
+| Catalog key | Was | Now |
+|---|---|---|
+| `activity-compose` | 1.9.3 | 1.13.0 |
+| `lifecycle` | 2.8.7 | 2.11.0 |
+| `datastore` | 1.1.1 | 1.2.1 |
+| `work` | 2.10.0 | 2.11.2 |
+| `glance` | 1.1.1 | 1.2.0 |
+
+Why Dependabot skipped them is not established. The catalog's `UNVERIFIED`
+markers are gone; every AndroidX/AGP line is marked `current` as of
+2026-09-17. **Check Google Maven directly now and then** rather than reading an
+empty queue as currency.
+
+### Dependabot alerts are on
+
+During the third session's sweep only *version updates* (driven by
+`dependabot.yml`) were on; *alerts / security updates* were off
+(`GET .../dependabot/alerts` → 403). The owner has since enabled both. The
+alerts endpoint returns `[]`, so the advisory watch exists and reports nothing
+open.
+
+What that is and is not: GitHub's advisory match against the dependency graph,
+not a lockfile audit. No `osv-scanner` run has happened; it is now possible from
+the build server and is the stronger check before a release. The sweep itself
+fixed no known vulnerability, because none was ever reported, and the
+security-crypto move off alpha was supply-chain maturity, not a patch.
+
+### setup-gradle v6.3.0 on the open-source cache
+
+PR #9's SHA resolves to the upstream v6.3.0 tag. From v5 the action defaults to
+`cache-provider: enhanced`, a **proprietary, closed-source** caching service
+with its own terms of use. The owner chose `basic`, the open-source cache v4
+used, and both `setup-gradle` steps (`ci.yml`, `release.yml`) set it with a
+comment. CI's log confirms "Basic Caching". **If a future bump leaves CI
+logging "Enhanced Caching", that setting has been lost.**
+
+Also re-checked: every other action pin resolves to its labelled tag, and
+`gradle-wrapper.jar` matches Gradle's published SHA-256 for 9.7.1.
+
+### Also
+
+- `SKILLS-RECOMMENDATION.md` (scratch findings for claude-vibe-skills) is
+  deleted. Its content is retrievable from `de2c721`.
+- `dependabot.yml`'s comment no longer points at the old markers, and says
+  security updates come from repository settings, not that file.
 
 ---
 
@@ -100,11 +230,10 @@ is described below because the reason is worth knowing.
 module, so `:app` could not see it. Thirty-eight tests had passed locally
 against code that compiled nowhere.
 
-**This is a class of error the off-device harness cannot catch by
-construction**, because it compiles files inside a single module where
-`internal` always resolves. The remedy is in "Verifying work without an
-Android SDK" below: a grep that checks every `:app` reference into another
-module is `public`. Run it before any push that adds one.
+**This is a class of error the single-module harness cannot catch by
+construction**, because `internal` always resolves inside one module. A real
+build on the build server does catch it. If you are ever back in the sandboxed
+container, the grep in "Building and verifying" is the remedy.
 
 ### The battery work, which is most of what this app is for
 
@@ -171,7 +300,7 @@ Things in there that look like details and are not:
 ## What changed in the first session
 
 Five commits, each green in CI (`1a99674`, `9e7760c`, `dac12fe`, `1a99a41`,
-`3fe7a27` — confirm the last one, see "CI status" below).
+`3fe7a27`).
 
 1. **The command funnel moved from `:widget` to `:data`** and stopped collapsing
    every failure into `false`. `CommandOutcome` now separates reasons knowable
@@ -282,235 +411,53 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## The dependency sweep — done, and what it was hiding
+## The third session: the dependency sweep
 
-**All seven Dependabot PRs are resolved.** Six merged, #4 closed as superseded.
-Nothing is open. The previous version of this document laid out a suggested
-order and called it "a plan, not a verdict" — which was the right caution,
-because the plan was wrong in three places and only building them showed it.
+Kept short; the CHANGELOG and commit messages carry the detail. Seven
+Dependabot PRs: #5 security-crypto → 1.1.0, #2 JUnit 6.1.3, #8 actions ×3, #3
+Gradle wrapper 9.7.1, #1 AndroidX minor-and-patch ×5, #6 Compose BOM
+2026.09.00, all merged; #4 AGP 9.4.0 closed and landed directly. Three lessons
+that still apply:
 
-| PR | Bump | Outcome |
-|---|---|---|
-| #5 | security-crypto `1.1.0-alpha06` → `1.1.0` | merged first — needed nothing else |
-| #2 | junit-jupiter `5.11.4` → `6.1.3` | merged |
-| #8 | `actions` group ×3 | merged |
-| #3 | gradle-wrapper `8.14.3` → `9.7.1` | merged |
-| #4 | agp `8.7.3` → `9.4.0` | closed; landed directly instead |
-| #1 | `minor-and-patch` ×5 | merged, after AGP 9 + compileSdk 37 |
-| #6 | compose-bom → `2026.09.00` | merged, same |
+1. **An empty check list is not a pass.** Four PRs had never been built, because
+   the `pull_request` trigger read `branches: [main, master]` in a repo with
+   neither. Both triggers are `['**']` now. To get a verdict on a stale PR, use
+   GitHub's "Update branch"; `@dependabot rebase` does not work from an agent.
+2. **"minor-and-patch" says nothing about risk.** A minor AndroidX bump demanded
+   AGP ≥ 9.1.0 and `compileSdk` ≥ 37.
+3. **Measure couplings rather than inheriting them.** "AGP 8 will not run on
+   Gradle 9" was false. AGP 9 needs Gradle ≥ 9.6.0, not the reverse.
 
-### What it did not do: fix a single vulnerability
+`compileSdk` is 37 because AndroidX demanded it. **`targetSdk` stays 35
+deliberately**: it opts the app in to new runtime behaviour, wants device
+testing, and is likely at or below the Play Store floor. That is a release
+decision, pinned with its reasoning in `libs.versions.toml`.
 
-Worth being blunt about, because "cleared the Dependabot queue" reads like
-security work and this was not that. **No known vulnerability was fixed,
-because none was ever reported.** GitHub has two separate Dependabot features,
-and during the sweep this repository had only one of them switched on:
+**Pin comments lie; resolve the SHA.** CI was dead for the project's whole
+early history because setup-gradle was pinned to a SHA in no tag, and later a
+pin labelled v4.4.4 pointed at v4.4.3. `git ls-remote --tags <repo>` settles it.
 
-- **Version updates**: driven by `.github/dependabot.yml`, scheduled weekly.
-  All seven PRs were these.
-- **Security updates / alerts**: driven by the GitHub Advisory Database,
-  raised only when a dependency matches a published advisory. **Off at the
-  time** (`GET .../dependabot/alerts` → `403 "Dependabot alerts are disabled for
-  this repository."`).
-
-**Both are on now** (checked in the fourth session): alerts return `[]` instead
-of 403, and `security_and_analysis.dependabot_security_updates` is `enabled`.
-So something is watching for CVEs, and it currently reports none open. That is
-GitHub's advisory match against the dependency graph, not a lockfile audit. A
-one-off `osv-scanner` run is now possible from the build server and would be
-the stronger check before a release.
-
-Two claims that are easy to conflate, and should not be:
-
-- `androidx.security:security-crypto` alpha06 → stable 1.1.0 is a **supply
-  chain maturity** improvement (a pre-release library guarding the app's only
-  credential), **not** a patch for a known exploit. The package having
-  "security" in its name makes the stronger reading tempting. Its APIs are
-  also now deprecated upstream (the local build warns on every use in
-  `KeystreamStore`).
-- The gate file's "0 Critical / 0 High" is a review of the **diff**, which is
-  what dev-skills means by that gate. It is **not** a CVE scan of the
-  dependency tree.
-
-The security-shaped work that *was* done in the third session was defensive
-rather than remedial: both action SHAs resolved against their upstream tags,
-the `setup-gradle` pin caught claiming v4.4.4 while pointing at v4.4.3, and the
-widened trigger confirmed to be `pull_request` rather than
-`pull_request_target` (read-only token, no secrets, so a fork PR cannot reach
-anything). The fourth session re-resolved every pin and checked the wrapper
-jar's SHA-256 against Gradle's published checksum for 9.7.1; all match.
-
-### Currency: an empty queue did not mean current
-
-The third session concluded everything was current once the queue was empty.
-Checked against Google Maven directly in the fourth, five AndroidX lines were
-behind with no Dependabot PR offering them:
-
-| Catalog key | Pinned | Latest stable (2026-09-17) |
-|---|---|---|
-| `activity-compose` | 1.9.3 | 1.13.0 |
-| `lifecycle` | 2.8.7 | 2.11.0 |
-| `datastore` | 1.1.1 | 1.2.1 |
-| `work` | 2.10.0 | 2.11.2 |
-| `glance` | 1.1.1 | 1.2.0 |
-
-Why Dependabot skipped them is not established. **All five are now bumped**
-(its own commit), compiling with no source changes, and the catalog marks every
-AndroidX/AGP line `current` instead of `UNVERIFIED`. Glance and WorkManager
-carry the widgets, the tile and the command funnel, so those are what to look
-at on a device.
-
-### PR #9: setup-gradle v6.3.0, and the caching choice
-
-Dependabot offered `gradle/actions/setup-gradle` 4.4.3 → 6.3.0 after the
-fourth session's push. The SHA resolves to the upstream v6.3.0 tag and CI was
-green on it. The owner squash-merged it (`af0c7a2`).
-
-It changes more than a version: from v5 the action defaults to
-`cache-provider: enhanced`, a **proprietary, closed-source** caching provider
-with its own terms of use (the CI log says so on every run, and points at
-`gradle/actions` `DISTRIBUTION.md`). v4 used the open-source cache. For a
-repository that resolves every action SHA by hand, the consistent choice was
-`cache-provider: basic`, and the owner chose it: both `setup-gradle` steps, in
-`ci.yml` and `release.yml`, now set it, with a comment. If a future bump
-leaves CI logging "Enhanced Caching", that setting has been lost.
-
-### The three things the plan got wrong
-
-**1. Four of the seven had never been built.** Not red — *empty*. Their base
-predated `ci.yml`'s `push: branches: ['**']`, and the `pull_request` trigger
-read `branches: [main, master]`, which matches nothing in a repository whose
-default branch is `claude/load-dev-skills-d0bioe`. Neither trigger fired. An
-empty check list reads like "fine" in a way a red X never does, and that is how
-#1 and #8 came to be described as "low risk by definition" without a verdict
-behind either. Both triggers are `['**']` now.
-
-If you ever need a verdict on a stale PR here: GitHub's "Update branch" works
-(`update_pull_request_branch`), and it fires a push event that CI does answer.
-`@dependabot rebase` does **not** work from an agent — the mention is stripped
-before it reaches Dependabot.
-
-**2. "minor-and-patch" said nothing about risk.** Every bump in #1 failed, and
-so did all 22 artifacts in #6, on the same condition: the AndroidX artifacts
-require AGP ≥ 9.1.0 *and* `compileSdk` ≥ 37. A minor bump of a library can
-demand a major bump of the build plugin. So #1 and #6 were not the easy
-warm-up items — they were downstream of the hardest one, and the queue's real
-shape was the opposite of the order it was written in.
-
-**3. Gradle 9 and AGP 9 are coupled one way, not both.** This document
-previously said "AGP 8.7.3 will not run on Gradle 9 — so merging either alone
-breaks the build", and held both back as one large change. Gradle 9.7.1 built
-green on AGP 8.7.3. The real constraint, from #4's own failure, is:
-
-```
-Minimum supported Gradle version is 9.6.0. Current version is 8.14.3.
-```
-
-AGP 9 needs Gradle ≥ 9.6.0; Gradle 9 does not need AGP 9. So the wrapper went
-first, alone, and the AGP major became a separately-gated change instead of a
-two-major migration landing at once. That claim was inherited rather than
-measured — the same failure mode this project has already recorded twice
-against the openHAB binding.
-
-### AGP 9, and built-in Kotlin (opted out, then migrated)
-
-AGP 9.0 enables built-in Kotlin by default, which makes applying
-`org.jetbrains.kotlin.android` a hard error (CI run #38). The third session
-opted out with `android.builtInKotlin=false` / `android.newDsl=false`, because
-built-in Kotlin compiles with the Kotlin that AGP resolves, that has to agree
-with the Compose compiler plugin at the catalog's `kotlin = 2.4.20`, and the
-container could not see which version that would be.
-
-**The fourth session answered that and took the migration.** AGP 9.4.0's POM
-depends on Kotlin 2.2.10, but the root build file's
-`alias(libs.plugins.kotlin.jvm) apply false` puts kotlin-gradle-plugin 2.4.20 on
-the shared build classpath, and `./gradlew :ui:buildEnvironment` shows 2.4.20 is
-what resolves. So `kotlin-android` is gone from the five Android modules, the
-root build file and the catalog, and both flags are gone from
-`gradle.properties`. Nothing blocks AGP 10 on this front any more.
-
-**That root `kotlin.jvm` line is now load-bearing for every module, not just
-`:protocol`.** Removing it was tried: the build does not configure at all
-("plugin is already on the classpath with an unknown version"). When bumping
-`kotlin`, the Compose plugin moves with it through the same catalog entry,
-which is the pairing that has to hold.
-
-### compileSdk 37, targetSdk still 35
-
-`compileSdk` is 37 because the AndroidX artifacts demanded it. `targetSdk`
-stays at 35 deliberately: it opts the app in to new *runtime* behaviour and
-wants testing on a device, and this app cannot yet move a shade. The README
-flags targetSdk 35 as likely at or below the Play Store floor — real, and a
-release decision with its own gate, not part of a dependency sweep. The
-reasoning is pinned beside the value in `libs.versions.toml` so the gap does
-not read as an oversight.
-
-### The one check nobody has run
-
-**The Compose BOM jump is verified only as "it compiles".** 2024.12.01 →
-2026.09.00 is close to two years of Material 3 across 22 artifacts, and the
-OLED theme leans on the `surfaceContainer` roles and `surfaceTint` — exactly
-the kind of thing that shifts over that span. Nothing in the container can
-render a screen.
-
-Install the debug APK CI uploads and look at the shade list, the detail screen
-and the settings screen under **Black (OLED)** and under **Light**, at
-container backgrounds and at whether the OLED scheme's deliberately-not-black
-containers still read as intended. It is its own commit, so a revert is cheap
-if they do not.
-
-### Action pins, and a lesson that repeats
-
-`actions/setup-java` v6.0.1 and `actions/upload-artifact` v7.0.1 were taken
-after resolving both SHAs against the upstream tags directly, rather than
-trusting the comments beside them. The `gradle/actions/setup-gradle` pin was
-labelled `# v4.4.4` while pointing at **v4.4.3**, both before and after #8 —
-Dependabot moved it from the annotated tag object to the commit, which is the
-correct form, and carried the wrong label across. The label was corrected down
-to v4.4.3 rather than the pin moved up, because the label is what Dependabot
-reads to decide what to offer next; gradle/actions is on v6.0.1 now, so expect
-an offer.
-
-This is the third time a pin comment has mattered in this repository. CI here
-was dead for the project's entire history because setup-gradle was pinned to a
-SHA in no tag at all. Resolve the SHA; do not read the comment.
-
-### Note on this branch being the default branch
-
-`claude/load-dev-skills-d0bioe` is the repository's default branch. There is no
-`main`, no `master`, and no tags. That is why Dependabot targets it without any
-`target-branch` setting in `dependabot.yml`, and it is worth knowing before
-applying any rule that says "merges to the default branch are releases" — by
-the letter, every dependency merge here is one. They were treated as work
-commits, which is the honest reading while nothing is versioned, tagged or
-published. If a real release is ever cut, creating a real `main` is the tidier
-fix.
+**This branch is the default branch.** Dependabot targets it with no
+`target-branch`, and by the letter of "merges to the default branch are
+releases" every merge here is one. They are treated as work commits while
+nothing is versioned, tagged or published. If a real release is cut, creating a
+real `main` is the tidier fix.
 
 ---
 
-## Next step: step 5 — everything else is done
+## Next build-order step: step 5
 
-**Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
-that when this session offered to start it. An earlier version of this
-document recommended pulling it forward; that recommendation is withdrawn, and
-the reasoning is kept below only because the decision it records is still open
-and will still be needed when step 5's turn comes.
-
-**Step 5 is now the only thing left**, and step 6 comes with it rather than
-before it. That is not a scheduling preference: step 6's one remaining
-deliverable is the guided derive-from-capture flow, which *is* keystream
-onboarding — it ends in a keystream in `EncryptedSharedPreferences`, the same
-spine step 5 introduces. Building it separately would be building step 5
-under another number. The rest of step 6 is already done and was before this
-session: `CommandQueue` is owned by `ShadeGattClient`, and tilt and secondary
+**Step 5 stays last, and is next.** Step 6 comes with it rather than before it:
+step 6's one remaining deliverable is the guided derive-from-capture flow,
+which *is* keystream onboarding and ends in the same place. The rest of step 6
+is done: `CommandQueue` is owned by `ShadeGattClient`, and tilt and secondary
 have controls on the detail screen and rows in the action editor.
 
-The one genuinely open piece of step 6 is **persisting the sequence
-counter**, and it cannot be settled here. `ActionRunner` keeps an in-memory
-per-shade counter that resets on process death; whether that matters depends
-on whether the shade validates sequence monotonicity as replay protection,
-which no one has observed. It is a `docs/PROTOCOL.md` §8 question, answerable
-the first time a real write lands — which is step 5.
+The one open piece of step 6 is **persisting the sequence counter**.
+`ActionRunner` keeps an in-memory per-shade counter that resets on process
+death; whether that matters depends on whether the shade validates sequence
+monotonicity, which no one has observed. It is a `docs/PROTOCOL.md` §8
+question, answerable the first time a real write lands.
 
 ### The step 5 decision, when its turn comes
 
@@ -536,44 +483,72 @@ wrapper.
 percent — not a full open. It is the first time this code can move a physical
 object, and the frame layout is the least-verified thing in the project.
 
-## Verifying work without an Android SDK
+## Building and verifying
 
-**If you are on the build server, skip most of this section.** It has an
-Android SDK at `~/Android/Sdk` and reaches Google Maven, so run CI's tasks
-directly (`local.properties` with `sdk.dir=...` is ignored by git). What
-follows applies to the sandboxed Claude Code container, where none of that is
-true. The cross-module `internal` blind spot below does not exist on a real
-build, which compiles each module separately.
+### On the build server (normal case)
 
-**The Android modules cannot be built in the Claude Code container.** No Android
-SDK, and the network policy blocks `dl.google.com` / `maven.google.com`, so AGP
-will not resolve. `./gradlew :protocol:test` fails there too — at the *root*
-project's plugin block, before it reaches `:protocol`. CI is the compiler.
-
-**But more can be checked locally than it first appears, and it is worth
-doing.** Gradle 8.14.3 is cached and Maven Central is reachable, so any file
-with no Android imports can be compiled and tested in an isolated project:
+The server has an Android SDK at `~/Android/Sdk` (platforms 35 and 37) and
+reaches Google Maven. `local.properties` with `sdk.dir=/home/serveradmin/Android/Sdk`
+is ignored by git; create it if missing.
 
 ```
-settings.gradle.kts:  repositories { mavenCentral() }  (+ gradlePluginPortal)
-build.gradle.kts:     kotlin("jvm") version "2.4.20"; testImplementation junit
-                      jvmTarget 17, options.release 17
-                      (no toolchain block — the container has JDK 21 only)
-run:  ./gradlew --project-dir <harness> test
+./gradlew :protocol:test assembleDebug test assembleRelease lint
 ```
 
-Files that qualify today: all of `:protocol`, plus `Shade.kt`, `ShadeAction.kt`
-(strip `@Serializable` in the harness only), `ActionResult.kt`, `ThemeMode.kt`,
-the `:ui` files `ShadeFormatting.kt`, `ActionDraft.kt` and `ThemeSelection.kt`,
-and `:widget`'s `WidgetPresentation.kt`.
+That is exactly CI's task list. Run it before pushing. It builds the debug APK,
+runs 141 test cases, exercises R8 on the release build and runs full lint.
+Useful extras:
 
-**Two blind spots this method does not cover. Both bit in one session.**
+- `./gradlew :ui:buildEnvironment`: which Kotlin Gradle plugin actually resolves.
+- `https://dl.google.com/android/maven2/<group path>/<artifact>/maven-metadata.xml`:
+  the real latest version of any AndroidX artifact, independent of Dependabot.
+- `git ls-remote --tags https://github.com/<owner>/<repo>`: what an action pin
+  really points at.
 
-*Cross-module visibility.* The harness compiles files in a single Gradle
-module, so `internal` always resolves — but `internal` is per module, and
-`:app` calling an `internal` declaration in `:widget` is a hard error that
-only CI sees. It cost a red build (run #22, `ActionShortcuts`). Before
-pushing anything `:app` calls, run:
+What it cannot do: render a screen, or touch a shade. Compose appearance, widget
+behaviour and anything BLE still need a phone.
+
+Test counts, by annotated test method:
+
+| Module | Methods | Files |
+|---|---|---|
+| `:protocol` | 20 | 18 `@Test` + 2 `@ParameterizedTest` |
+| `:data` | 4 | `ActionResultTest` |
+| `:ui` | 47 | `ShadeFormattingTest`, `ActionDraftTest`, `ThemeSelectionTest` |
+| `:widget` | 50 | `WidgetPresentationTest`, `BatteryWidgetPresentationTest` |
+
+121 methods; `:protocol`'s two parameterised tests expand its 20 to 40 cases,
+for **141 executed**, which is what Gradle and CI report.
+
+**Keep putting pure logic in files with no Android imports.** It is why
+`groupIntoRooms` and the outcome-wording functions live in `ShadeFormatting.kt`
+rather than inside Compose files, and it keeps them unit-testable on the JVM.
+
+### In the sandboxed Claude Code container (fallback)
+
+Sessions 1–3 ran there. No Android SDK, and the network policy denies
+`dl.google.com` (`maven.google.com` redirects to it), so AGP never resolves and
+even `./gradlew :protocol:test` fails at the root plugin block. CI is the only
+compiler there. Confirm the block with
+`curl -sS "$HTTPS_PROXY/__agentproxy/status"`.
+
+What still works there:
+
+- **An isolated JVM harness** for files with no Android imports: a throwaway
+  project with `kotlin("jvm") version "2.4.20"`, JUnit, `jvmTarget` 17 and no
+  toolchain block (the container has JDK 21 only). Qualifying files: all of
+  `:protocol`, `Shade.kt`, `ShadeAction.kt` (strip `@Serializable`),
+  `ActionResult.kt`, `ThemeMode.kt`, `ShadeFormatting.kt`, `ActionDraft.kt`,
+  `ThemeSelection.kt`, `WidgetPresentation.kt`. About 62 of the tests run there.
+- **Documentation hosts are reachable** even though artifacts are not:
+  `developer.android.com`, `kotlinlang.org`, plain-git `github.com`, and the
+  AndroidX sources at `raw.githubusercontent.com/androidx/androidx/androidx-main/...`.
+  Read the API or migration guide before guessing; one fetch beats a CI round
+  trip. Beware that `androidx-main` is newer than the pinned releases.
+
+Its blind spot: the harness compiles everything in one module, so `internal`
+always resolves, and `:app` calling an `internal` declaration in `:widget`
+only fails in CI (run #22). Before pushing anything `:app` calls from there:
 
 ```
 for sym in $(grep -o "com\.scrivtech\.powerview\.widget\.[A-Za-z]*" \
@@ -584,158 +559,46 @@ done
 
 Every hit must read `public`.
 
-*The AndroidX sources on `androidx-main` are newer than the pinned version.*
-Most signatures are stable across the gap, but not all: `LazyColumn` on main
-takes a required `verticalScrollMode` that Glance 1.1.1 does not have. When a
-signature looks newer than expected, either find the release branch or avoid
-the API — the battery widget caps its rows instead of scrolling for exactly
-this reason, which turned out to be the better design anyway.
-
-**The other half of verifying blind: read the API before calling it.** The
-Glance work was written against the AndroidX sources on GitHub
-(`raw.githubusercontent.com/androidx/androidx/androidx-main/glance/...`),
-which is reachable from here even though Google Maven is not. Checking a
-signature costs one fetch; guessing one costs a CI round trip, and guessing
-wrong about whether something is a member or a top-level extension is a
-coin flip either way — an unresolved import and a missing import are both
-hard errors. `BatteryLevel`/`batteryLevelOf`
-live inside `BatteryReader.kt`, which imports Android, so the harness needs a
-small verbatim copy of just those declarations.
-
-**What is reachable from here, precisely — it is not "no Google".** The
-network policy denies `dl.google.com`, and `maven.google.com` 301-redirects
-there, so no AndroidX or AGP artifact or POM can be fetched and Gradle cannot
-resolve an Android build. Confirm it yourself with
-`curl -sS "$HTTPS_PROXY/__agentproxy/status"`, which logs the rejected CONNECT.
-
-But Google's *documentation* host is fine. `developer.android.com` and
-`kotlinlang.org` both serve normally, and so does `github.com` over plain git —
-`git ls-remote https://github.com/<owner>/<repo>` resolves any action's tags,
-which is how the setup-gradle pin was caught pointing at v4.4.3 under a v4.4.4
-label.
-
-That distinction earned its keep in the third session. AGP 9 failed CI on the
-`kotlin-android` plugin, and the obvious reflex — delete the plugin from six
-files — would have been wrong in a way CI would have taken two more round trips
-to reveal. Fetching
-`developer.android.com/build/migrate-to-built-in-kotlin` instead showed both
-the migration *and* the documented opt-out, and the note that built-in Kotlin
-compiles with AGP's bundled Kotlin, which is what makes the Compose plugin pin
-a live question. One fetch, one correct commit.
-
-So: **artifacts no, documentation yes.** Read the docs before guessing at an
-API or a migration, exactly as the Glance work did against the AndroidX
-sources.
-
-This paid for itself in an earlier session too: the harness caught a compile
-error in a new test file before CI saw it. **When you write new logic, put the pure part in a file with no
-Android imports so it can be checked this way.** That is why `groupIntoRooms`
-and the outcome-wording functions live in `ShadeFormatting.kt` rather than
-inside the Compose files that use them.
-
-Test counts as of this commit, by annotated test method:
-
-| Module | Methods | Files |
-|---|---|---|
-| `:protocol` | 20 | 18 `@Test` + 2 `@ParameterizedTest` |
-| `:data` | 4 | `ActionResultTest` |
-| `:ui` | 47 | `ShadeFormattingTest`, `ActionDraftTest`, `ThemeSelectionTest` |
-| `:widget` | 50 | `WidgetPresentationTest`, `BatteryWidgetPresentationTest` |
-
-Earlier versions of this document said "40 in `:protocol`". That is the
-*executed case* count CI reports — the two parameterised tests expand — not
-the method count, and it cannot be checked from the container because
-`:protocol:test` fails at the root plugin block before it reaches the module.
-Both numbers are right about different things; this table counts methods,
-which is the one you can verify here with `grep -c '@Test'`.
-
-A full local run (fourth session) executes **141** test cases, 0 failed or
-skipped: the 121 methods above, with `:protocol`'s two parameterised tests
-expanding its 20 methods to 40 cases.
-
-Of those, 62 run in the off-device harness (everything in `:ui` and
-`:widget` that has no Android imports, plus the `:data` pure files).
-
-Also verifiable locally: workflow files with `actionlint`.
-
-**Everything Compose remains CI-verified only.** Budget a round trip for it.
-
 ---
 
 ## CI status
 
-**Green on the branch head**, including `assembleRelease` with R8, which is
-where `lintVitalRelease` runs. Every commit on this branch has been seen by a
-compiler. The fourth session's built-in Kotlin migration was built locally
-with CI's exact tasks before being pushed.
+**Green on the head (`238fbb5`)**: `:protocol` tests, debug APK, unit tests,
+release APK with R8, and full lint. `Lint workflows` (actionlint) is green too.
 
-**Full `./gradlew lint` passes now, and CI runs it.** It had never passed and
-CI had it commented out, while `lintVitalRelease` stayed green, so nothing
-noticed. Its `MissingPermission` and `InlinedApi` findings in `ShadeScanner`
-led to a real bug: `hasScanPermission` checked `BLUETOOTH_SCAN`, which does not
-exist below API 31, and the app never requested `ACCESS_FINE_LOCATION`, which a
-scan needs there. **Scanning could never have worked on Android 8–11.** Fixed
-with `ShadeScanner.scanPermission()` and a location request in `MainActivity`
-below 31, but it has not been tried on such a device. Lint's warnings (not
-errors) are still there: `OldTargetApi` on targetSdk 35, some `UseKtx` and
-`UnusedAttribute`.
+Genuine failures in this branch's history, all fixed forward:
 
-The third session's runs went #33–#37 ✅ (the Dependabot merges, most of them
-cancelled by the next merge landing — see below), **#38 ❌ AGP 9**, #39 ✅ the
-built-in Kotlin opt-out, #40 ✅ compileSdk 37, then the #1 and #6 merges.
+- **#22**, `ActionShortcuts` was `internal` where `:app` needed it public.
+- **#38**, AGP 9.4.0 rejecting `org.jetbrains.kotlin.android`; opted out, then
+  migrated in the fourth session.
+- **`560e09e`**, pushed out of order and not buildable alone (see the fourth
+  session). Its CI run failed; `7a4c3e5`, pushed a minute later, is green.
 
-Two genuine failures exist in this branch's history and both are fixed rather
-than papered over:
-
-- **#22**, `ActionShortcuts` was `internal` where `:app` needed it public. See
-  "The red build" above for why the local harness cannot catch that class of
-  error at all.
-- **#38**, AGP 9.4.0 rejecting the `org.jetbrains.kotlin.android` plugin. Fixed
-  forward in the next commit rather than reverted, because the cause was
-  named precisely in the log and the fix was a documented flag. See "The
-  dependency sweep" above.
-
-The `cancelled` runs are **not** failures. CI sets `cancel-in-progress: true`
-on its concurrency group, so a run dies when the next push to the same branch
-starts. Merging six PRs in quick succession produced a row of them. If you push
-twice in quick succession, read the *later* run.
-
-That group is now keyed on `github.head_ref || github.ref_name` — note
-`ref_name`, not `ref`. The `pull_request` trigger overlaps `push` in this
-repository, and `head_ref || ref` does *not* collapse the pair (`<branch>`
-versus `refs/heads/<branch>`), which quietly cost a duplicate build on every
-pull request until it was caught.
+`cancelled` runs are **not** failures. CI's concurrency group has
+`cancel-in-progress: true`, so a run dies when the next push to the same branch
+starts; read the *later* run. The group is keyed on
+`github.head_ref || github.ref_name` (not `ref`), which is what makes a PR's
+`push` and `pull_request` runs collapse into one.
 
 ```
 https://github.com/darthrater78/hunter-douglas-blind/actions
 ```
 
-## Blocked, not skipped
+## Open, not blocking
 
-These were identified in the audit and cannot be completed from the sandbox:
-
-- **Gradle dependency locking and `gradle/verification-metadata.xml`.** Both are
-  generated from a successful dependency resolution, which needs Google Maven.
-  No longer blocked: the build server can resolve the tree. Not yet done.
-- **Currency of the pinned versions: mostly answered, and not by the queue.**
-  The Dependabot queue being empty was read as "everything is current", and it
-  was not. See "Currency" above: five AndroidX lines were behind and are now
-  bumped. As of 2026-09-17 the whole catalog, AGP and the wrapper are current,
-  checked against Google Maven rather than inferred, and setup-gradle is on
-  v6.3.0 (PR #9).
-- **`androidx.security:security-crypto` is on the stable `1.1.0`** as of PR #5.
-  That closes the alpha concern, which was pressing because step 5 is about to
-  put a real keystream behind it. It does **not** settle the larger question:
-  Jetpack has been steering away from `EncryptedSharedPreferences` entirely,
-  and whether it is the right home for the keystream is a call still owed
-  before a real release.
-- **`navigation-compose` is in the version catalog but referenced by no module**,
-  so its pin has never been resolved by any build. Screen state is currently a
-  saved route string plus a MAC in `PowerViewApp` — deliberate, and less code
-  than a `NavHost` at this size. If the screen graph grows, switching is easy,
-  but expect the first build that references it to be the one that discovers
-  whether 2.10.1 resolves against the pinned Compose BOM. It rode along in PR
-  #1 and is therefore the one bump in that group that nothing has verified.
+- **Gradle dependency locking and `gradle/verification-metadata.xml`.** Were
+  blocked on resolving the tree; the build server can now. Not done.
+- **An `osv-scanner` run** against the resolved tree before any release.
+- **Where the keystream lives.** security-crypto is on stable 1.1.0, but its
+  `EncryptedSharedPreferences`/`MasterKey` APIs are deprecated upstream (the
+  build warns in `KeystreamStore`). Whether it is the right home for a real
+  keystream is a call owed before a release, and step 5 is when it starts to
+  matter.
+- **`navigation-compose` 2.10.1 is in the catalog but used by no module**, so
+  no build has ever resolved it. Screen state is a saved route string plus a MAC
+  in `PowerViewApp`, deliberately.
+- **`targetSdk` 35**, a release decision (see the third session).
+- **`connectGatt` deprecation** warning in `ShadeGattClient.kt`. Harmless today.
 
 ---
 
@@ -751,15 +614,15 @@ rather than publishing a release that looks fine and is useless. Setup is in the
 README under "Release signing".
 
 For testing, CI uploads a **debug APK** on every push — debug-signed, installs
-directly, no secrets involved. Artifacts expire after 14 days. That APK is now
-worth installing: the app has a real UI to walk through, and everything except
-moving a shade works.
+directly, no secrets involved. Artifacts expire after 14 days. The same APK
+builds locally at `app/build/outputs/apk/debug/app-debug.apk`. It is worth
+installing now for the three device checks under "Waiting on a phone".
 
 ---
 
 ## How CI got un-stuck (history worth keeping)
 
-**CI had never successfully run** before the previous session.
+**CI had never successfully run** before the first session.
 `gradle/actions/setup-gradle` was pinned to a SHA that exists in no tag of that
 repository, so every run died at "Setup Gradle" — and because `release.yml`
 gates on a passing CI run, releases were unreachable too.
@@ -781,14 +644,19 @@ reflective factory instead of being added to `CommandWorker.Factory`.
 
 ## Working conventions
 
-- `.claude/dev-skills-gates.md` holds gate state and survives the container
-  because it is committed. Read it before any git write.
-- Commit approval does not carry across sessions. A standing approval granted in
-  one session means nothing in the next. The second session was given one
-  ("continue the automatic commit for this work since there's so many steps")
-  and it expired with it — **ask again**.
-- Tag pushes and ref deletions are always handed to the user to run, never
-  executed directly.
+- `.claude/dev-skills-gates.md` holds gate state and is committed. Read it
+  before any git write.
+- **Commit approval does not carry across sessions.** Each session has been
+  given approval for its own work; none of it carries forward. Ask again.
+- **Merging PRs is the owner's call.** In the fourth session `gh pr merge` was
+  blocked by the permission classifier and the owner merged PR #9 themselves.
+  Verify the PR (SHA, CI, what changed), then hand it over with the command.
+- Tag pushes and ref deletions are always handed to the user to run.
+- **Do not chain `git commit` steps with `&&` after a command that can fail.**
+  In the fourth session a failed `git reset` on a deleted path skipped the first
+  commit while the rest of the script committed and pushed, which is how
+  `560e09e` landed unbuildable. Use `set -e`, one commit per call, and check
+  `git log` before pushing.
 - Commit messages in this repo explain *why*, at length, and record what was
-  verified versus what CI still had to check. Keep that up — it is most of the
-  reason this document can be written at all.
+  verified versus what was not. Keep that up; it is most of the reason this
+  document can be written at all.
