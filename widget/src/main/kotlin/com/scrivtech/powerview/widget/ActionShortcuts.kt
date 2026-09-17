@@ -11,13 +11,16 @@ import com.scrivtech.powerview.data.ShadeAction
  * Publishes one launcher shortcut per saved action, so a long-press on the
  * app icon runs one without opening it (build order step 11, spec §3.1).
  *
+ * Public rather than internal because `:app` is what drives it: `internal`
+ * is per Gradle module, so the Application could not see it.
+ *
  * Republished whenever the action list changes rather than once at startup:
  * a shortcut is a copy of the label, so a renamed action would otherwise
  * carry its old name on the launcher until the next cold start. The *id* is
  * the action's id, which is what keeps a pinned shortcut pointing at the
  * right action across a rename.
  */
-internal object ActionShortcuts {
+public object ActionShortcuts {
 
     /**
      * Replaces the published set with the actions that deserve one.
@@ -28,7 +31,7 @@ internal object ActionShortcuts {
      * during a burst of edits, or a launcher that does not support shortcuts
      * at all.
      */
-    fun publish(context: Context, actions: List<ShadeAction>) {
+    public fun publish(context: Context, actions: List<ShadeAction>) {
         val max = runCatching {
             ShortcutManagerCompat.getMaxShortcutCountPerActivity(context)
         }.getOrDefault(MAX_SHORTCUTS)

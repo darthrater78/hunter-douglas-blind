@@ -45,6 +45,24 @@
         </activity>
 
         <!--
+          Battery widget. Exported for the same reason as the action widget's
+          receiver: APPWIDGET_UPDATE comes from the widget host, outside the
+          app. It only ever reads what ShadeStore already holds and never
+          connects to a shade.
+        -->
+        <receiver
+            android:name="com.scrivtech.powerview.widget.BatteryWidgetReceiver"
+            android:exported="true"
+            android:label="@string/battery_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/battery_widget_info" />
+        </receiver>
+
+        <!--
           Quick Settings tile (build order step 11). The BIND_QUICK_SETTINGS_TILE
           permission is what makes exporting this safe: it restricts binding to
           the system, so "exported" here does not mean reachable by other apps.

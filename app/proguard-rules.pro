@@ -35,6 +35,7 @@
 # the failure mode if they are stripped is a home-screen widget whose buttons
 # do nothing in release builds only — the worst kind of bug to find late.
 -keep class com.scrivtech.powerview.widget.ShadeActionWidgetReceiver { *; }
+-keep class com.scrivtech.powerview.widget.BatteryWidgetReceiver { *; }
 -keep class com.scrivtech.powerview.widget.RunActionCallback { *; }
 
 # --- Tink (via androidx.security-crypto) -----------------------------------

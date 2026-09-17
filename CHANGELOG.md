@@ -55,6 +55,53 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
+- **A battery widget.** Every battery-powered shade on the home screen, worst
+  first, with a header saying how many are low or unread. Battery monitoring
+  is much of the point of this app; the weekly sweep and the low-battery
+  notification already existed, and this is the at-a-glance surface between
+  them — a notification only fires on a threshold crossing, and otherwise the
+  app has to be opened.
+
+  **It never connects to a shade.** Reading a battery means a full
+  connect/disconnect cycle, which spends the very thing being measured, so
+  the widget renders only what `ShadeStore` already holds. `updatePeriodMillis`
+  is 0 for a sharper reason than usual: a widget about battery life that woke
+  on a timer would spend battery life to learn nothing had changed. A tap
+  opens the app, where the per-shade "Read battery" button is the deliberate,
+  one-at-a-time way to spend that power.
+
+  Two things it refuses to imply. A shade that has never been read shows "Not
+  read yet", not 0% — and it does not count towards "low", because unknown is
+  not low. And a reading older than two sweep periods is shown with its age
+  attached, because a month-old number rendered as a bare percentage claims a
+  currency it does not have. Never-read shades sort above even the flattest
+  known one: they are the shades the sweep has not reached, so they are the
+  ones the app is least entitled to reassure anyone about.
+
+  Rows are capped with a counted overflow line rather than scrolled. Glance
+  has a lazy list, but this project pins Glance 1.1.1 and cannot compile
+  against it here to confirm which signature that version has — and with rows
+  sorted worst first, the ones that fit are the ones that matter. Hiding the
+  rest silently would make a monitoring widget lie by omission, so the count
+  is shown.
+
+  Redraws are pushed from `PowerViewApplication` watching `ShadeStore`, not by
+  the sweep directly: `BatterySweepWorker` lives in `:data`, which cannot see
+  `:widget`. The sweep runs in the app process, so the collector hears every
+  sweep result, rename, forget and manual read.
+
+  `BatteryLevel`, `batteryLevelOf` and `LOW_BATTERY_PERCENT` moved out of
+  `BatteryReader.kt` into their own file. They had no Android imports but
+  lived in a file that did, so the off-device harness had to keep a hand-made
+  copy of them — which is how a copy drifts and a test starts proving nothing.
+
+### Fixed
+- **`ActionShortcuts` was `internal`, so `:app` could not compile against it.**
+  `internal` is per Gradle module; the off-device harness compiles a single
+  module and therefore cannot catch this class of error at all. It is now
+  `public`, along with `refreshBatteryWidgets`, and `docs/HANDOFF.md` records
+  the check that finds it before CI does.
+
 - **Launcher shortcuts, completing build order step 11.** Long-press the app
   icon to run a saved action without opening the app. Up to four, alphabetical
   — there is no usage data to rank by, and an arbitrary order would shuffle

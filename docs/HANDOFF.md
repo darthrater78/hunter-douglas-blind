@@ -40,7 +40,7 @@ Build order progress (numbering follows the README):
 | 7 Persistence, labels/rooms, actions | ✅ shade list, rooms, naming, action editor |
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
 | 9 Glance widgets | ✅ widget, grid, config activity, per-instance state |
-| 10 Battery sweep + notifications | ✅ weekly sweep, one summary notification |
+| 10 Battery sweep + notifications | ✅ weekly sweep, one notification, battery widget |
 | 11 Quick Settings tile + shortcuts | ✅ tile, and four dynamic shortcuts |
 | 12 Home Assistant bridge | ⬜ optional |
 
@@ -280,6 +280,30 @@ Files that qualify today: all of `:protocol`, plus `Shade.kt`, `ShadeAction.kt`
 the `:ui` files `ShadeFormatting.kt`, `ActionDraft.kt` and `ThemeSelection.kt`,
 and `:widget`'s `WidgetPresentation.kt`.
 
+**Two blind spots this method does not cover. Both bit in one session.**
+
+*Cross-module visibility.* The harness compiles files in a single Gradle
+module, so `internal` always resolves — but `internal` is per module, and
+`:app` calling an `internal` declaration in `:widget` is a hard error that
+only CI sees. It cost a red build (run #22, `ActionShortcuts`). Before
+pushing anything `:app` calls, run:
+
+```
+for sym in $(grep -o "com\.scrivtech\.powerview\.widget\.[A-Za-z]*" \
+      app/src/main/kotlin/com/scrivtech/powerview/app/*.kt | sed 's/.*\.//' | sort -u); do
+  grep -rhn "\(object\|class\|fun\|val\) $sym\b" widget/src/main/kotlin/ | head -1
+done
+```
+
+Every hit must read `public`.
+
+*The AndroidX sources on `androidx-main` are newer than the pinned version.*
+Most signatures are stable across the gap, but not all: `LazyColumn` on main
+takes a required `verticalScrollMode` that Glance 1.1.1 does not have. When a
+signature looks newer than expected, either find the release branch or avoid
+the API — the battery widget caps its rows instead of scrolling for exactly
+this reason, which turned out to be the better design anyway.
+
 **The other half of verifying blind: read the API before calling it.** The
 Glance work was written against the AndroidX sources on GitHub
 (`raw.githubusercontent.com/androidx/androidx/androidx-main/glance/...`),
@@ -300,7 +324,8 @@ inside the Compose files that use them.
 Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
 (`ActionResultTest`), 44 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
 `ThemeSelectionTest` 7, `TileActionDescriptionTest` 2), 20 in `:widget`
-(`WidgetPresentationTest` 17, `TilePresentationTest` 6).
+(`WidgetPresentationTest` 17, `TilePresentationTest` 6, `ShortcutActionsTest` 6,
+`BatteryWidgetPresentationTest` 11, `BatteryRowsToShowTest` 6).
 
 Also verifiable locally: workflow files with `actionlint`.
 

@@ -4,7 +4,7 @@ Version: n/a — still pre-release, nothing tagged
 Updated: 2026-09-17 (session 2)
 
 🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ CI green through `7add46c` (run #21, incl. R8); shortcuts pending
+🔨 BUILD      ⚠️ `e10c16b` RED (run #22, internal visibility); fix + battery widget pending
 🔒 SECURITY   ✅ theme/widget/tile diffs scanned, 0 Critical / 0 High — see notes
 📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
 📦 RELEASE    ⬜ no PR open
@@ -44,7 +44,7 @@ Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
 compile error before CI this session.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 29 in `:widget`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 46 in `:widget`.
 
 ## Security gate notes
 **This session's work is scanned and clean** (0 Critical / 0 High).

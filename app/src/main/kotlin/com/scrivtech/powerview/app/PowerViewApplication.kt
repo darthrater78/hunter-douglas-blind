@@ -13,6 +13,7 @@ import com.scrivtech.powerview.data.ShadeRepository
 import com.scrivtech.powerview.data.ShadeStore
 import com.scrivtech.powerview.widget.ActionShortcuts
 import com.scrivtech.powerview.widget.CommandWorker
+import com.scrivtech.powerview.widget.refreshBatteryWidgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -56,6 +57,15 @@ public class PowerViewApplication : Application(), Configuration.Provider {
         // the Application rather than a view model.
         applicationScope.launch {
             actionStore.actions.collect { actions -> ActionShortcuts.publish(this@PowerViewApplication, actions) }
+        }
+
+        // The battery widget is redrawn from here rather than by the sweep
+        // that produces the readings: BatterySweepWorker lives in :data,
+        // which cannot see :widget. It runs in this process, though, so
+        // watching the store it writes to catches every sweep result as well
+        // as every rename, forget and manual "Read battery" from the app.
+        applicationScope.launch {
+            shadeStore.shades.collect { refreshBatteryWidgets(this@PowerViewApplication) }
         }
     }
 
