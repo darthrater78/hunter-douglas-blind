@@ -24,15 +24,22 @@ permissions:
   contents: read
 
 concurrency:
-  # head_ref before ref, because the two triggers above now overlap: a pull
-  # request inside this repository fires `push` on the branch AND
-  # `pull_request` on the same commits, and `github.ref` differs between them
-  # (refs/heads/<branch> versus refs/pull/<n>/merge) so they would land in
-  # separate groups and build the same tree twice. `github.head_ref` is the
-  # branch name on a pull_request event and empty everywhere else, so this
-  # collapses the pair into one group and leaves plain branch pushes exactly
-  # as they were.
-  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  # Both halves are deliberately branch NAMES, because the two triggers above
+  # overlap: a pull request inside this repository fires `push` on the branch
+  # and `pull_request` on the same commits, and without this they build the
+  # same tree twice.
+  #
+  # The pairing has to be exact to collapse, which is easy to get subtly wrong:
+  #
+  #   push          github.ref      refs/heads/<branch>   github.ref_name  <branch>
+  #   pull_request  github.ref      refs/pull/<n>/merge   github.head_ref  <branch>
+  #
+  # `head_ref || ref` does NOT work — it yields `<branch>` for the pull request
+  # and `refs/heads/<branch>` for the push, which are different strings, so both
+  # runs survive. PRs #1 and #6 each ran `build` twice under exactly that
+  # mistake. `ref_name` is the branch name with the refs/heads/ prefix already
+  # stripped, so `head_ref || ref_name` matches on both sides.
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
