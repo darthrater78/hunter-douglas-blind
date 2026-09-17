@@ -1,5 +1,6 @@
 package com.scrivtech.powerview.ui
 
+import com.scrivtech.powerview.data.ActionResult
 import com.scrivtech.powerview.data.BatteryLevel
 import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.Shade
@@ -178,3 +179,38 @@ internal fun commandOutcomeText(outcome: CommandOutcome): String = when (outcome
  */
 internal fun isWorthRetrying(outcome: CommandOutcome): Boolean =
     outcome is CommandOutcome.TransportFailed
+
+/**
+ * What to tell the user about a whole action's run.
+ *
+ * The case worth special-casing is an action where nothing was transmitted at
+ * all — which, until keystream onboarding exists, is every action. Listing six
+ * shades that each "failed" invites the user to go and investigate six shades,
+ * when the single cause is that setup is unfinished. One sentence about the
+ * cause beats six about its symptoms.
+ */
+internal fun actionResultText(
+    result: ActionResult,
+    labelForMacAddress: (String) -> String,
+): String = when (result) {
+    ActionResult.Pending -> "Running…"
+
+    ActionResult.Success -> "Sent."
+
+    is ActionResult.Failed -> when {
+        result.nothingAttempted -> {
+            // Every shade was blocked before BLE. If they were all blocked for
+            // the same reason, that reason is the whole story.
+            val reasons = result.outcomes.values.toSet()
+            // commandOutcomeText already says nothing was sent, so when every
+            // shade was blocked for the same reason it stands alone.
+            reasons.singleOrNull()?.let(::commandOutcomeText)
+                ?: "Nothing was sent — these shades are not ready to be controlled."
+        }
+
+        else -> {
+            val names = result.failedMacAddresses.map(labelForMacAddress).sorted()
+            "Some shades did not respond: ${names.joinToString(", ")}."
+        }
+    }
+}

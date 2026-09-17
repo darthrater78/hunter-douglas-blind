@@ -37,6 +37,22 @@ All notable changes to this project are documented here.
   than a speed.
 
 ### Added
+- **Saved actions are reachable**: a list screen that runs, edits and deletes
+  them, and an editor. Gen 3 shades have no on-shade scenes, so a `ShadeAction`
+  *is* the scene (spec §3.1), and widgets, the tile and shortcuts will all
+  reference these by id.
+- Every field in the action editor is opt-in, with a switch of its own. A null
+  field in a `Command` means "leave this rail where it is" — a real instruction
+  to the shade — so a slider alone could not distinguish "set tilt to 0" from
+  "don't touch the tilt". Shades with nothing enabled are dropped on save
+  rather than being sent a command that says nothing and still costs a full
+  connect/disconnect cycle.
+- An action whose shades were all blocked before BLE reports the single cause
+  once instead of listing every shade as failed. Until keystream onboarding
+  exists that is every action, and six failure rows would send the user
+  investigating six non-problems.
+- An action editor draft lives in its view model, so rotating the device
+  mid-edit does not discard a half-built action.
 - **In-app controls that drive `ActionRunner` directly** (build order step 8).
   The shade detail screen offers a slider and Send per rail, and only for the
   rails the shade's capability claims. Each rail sends only its own field: the

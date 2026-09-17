@@ -9,6 +9,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import com.scrivtech.powerview.ui.ActionsViewModel
 import com.scrivtech.powerview.ui.PowerViewApp
 import com.scrivtech.powerview.ui.ShadeListViewModel
 
@@ -31,6 +32,11 @@ public class MainActivity : ComponentActivity() {
             app.shadeStore,
             app.actionRunner,
         )
+    }
+
+    private val actionsViewModel: ActionsViewModel by viewModels {
+        val app = application as PowerViewApplication
+        ActionsViewModel.Factory(app.actionStore, app.actionRunner)
     }
 
     private val requestBlePermissions = registerForActivityResult(
@@ -62,7 +68,10 @@ public class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    PowerViewApp(viewModel = viewModel)
+                    PowerViewApp(
+                        viewModel = viewModel,
+                        actionsViewModel = actionsViewModel,
+                    )
                 }
             }
         }

@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 
 private const val ROUTE_SHADES = "shades"
 private const val ROUTE_DETAIL = "detail"
+private const val ROUTE_ACTIONS = "actions"
 private const val ROUTE_DEBUG = "debug"
 
 /**
@@ -25,12 +26,20 @@ private const val ROUTE_DEBUG = "debug"
  * navigation-compose would be, and it survives rotation just as well.
  * `navigation-compose` is in the version catalog but referenced by no module,
  * so its pin has never been resolved by a build — worth avoiding in the same
- * change that introduces three new screens. Swap it in when the graph is big
- * enough to earn it; nothing here depends on staying hand-rolled.
+ * change that introduces new screens. Swap it in when the graph is big enough
+ * to earn it; nothing here depends on staying hand-rolled.
+ *
+ * The action editor is not a route of its own. It is shown whenever
+ * [ActionsViewModel] holds a draft, so "is an edit in progress" has exactly one
+ * source of truth instead of a route and a draft that could disagree.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modifier) {
+public fun PowerViewApp(
+    viewModel: ShadeListViewModel,
+    actionsViewModel: ActionsViewModel,
+    modifier: Modifier = Modifier,
+) {
     var route by rememberSaveable { mutableStateOf(ROUTE_SHADES) }
     var selectedMac by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -40,6 +49,10 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
     val batteryReads by viewModel.batteryReads.collectAsState()
     val commands by viewModel.commands.collectAsState()
 
+    val actions by actionsViewModel.actions.collectAsState()
+    val runs by actionsViewModel.runs.collectAsState()
+    val draft by actionsViewModel.draft.collectAsState()
+
     val selectedShade = selectedMac?.let { mac -> shades.firstOrNull { it.macAddress == mac } }
 
     // The selected shade can disappear underneath the detail screen — it is
@@ -47,12 +60,20 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
     // back to the list rather than rendering a detail screen with no subject.
     val currentRoute = if (route == ROUTE_DETAIL && selectedShade == null) ROUTE_SHADES else route
 
-    fun goToList() {
+    val savedShades = shades.filter { it.macAddress in savedMacAddresses }
+    val labelForMacAddress: (String) -> String = { mac ->
+        shades.firstOrNull { it.macAddress == mac }?.label ?: mac
+    }
+
+    fun goToShades() {
         route = ROUTE_SHADES
         selectedMac = null
     }
 
-    BackHandler(enabled = currentRoute != ROUTE_SHADES) { goToList() }
+    // An open editor is what Back closes first; only then does the route change.
+    BackHandler(enabled = currentRoute != ROUTE_SHADES || draft != null) {
+        if (draft != null) actionsViewModel.cancelEdit() else goToShades()
+    }
 
     Scaffold(
         modifier = modifier,
@@ -60,20 +81,29 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
             TopAppBar(
                 title = {
                     Text(
-                        when (currentRoute) {
-                            ROUTE_DETAIL -> selectedShade?.label.orEmpty()
-                            ROUTE_DEBUG -> "Raw scan"
+                        when {
+                            draft != null && currentRoute == ROUTE_ACTIONS -> "Edit action"
+                            currentRoute == ROUTE_DETAIL -> selectedShade?.label.orEmpty()
+                            currentRoute == ROUTE_ACTIONS -> "Actions"
+                            currentRoute == ROUTE_DEBUG -> "Raw scan"
                             else -> "Shades"
                         },
                     )
                 },
                 navigationIcon = {
-                    if (currentRoute != ROUTE_SHADES) {
-                        TextButton(onClick = { goToList() }) { Text("Back") }
+                    if (currentRoute != ROUTE_SHADES || draft != null) {
+                        TextButton(
+                            onClick = {
+                                if (draft != null) actionsViewModel.cancelEdit() else goToShades()
+                            },
+                        ) {
+                            Text("Back")
+                        }
                     }
                 },
                 actions = {
                     if (currentRoute == ROUTE_SHADES) {
+                        TextButton(onClick = { route = ROUTE_ACTIONS }) { Text("Actions") }
                         // The debug screen stays reachable: it is the tool that
                         // confirmed the advertisement offsets against hardware,
                         // and the open questions in docs/PROTOCOL.md §8 mean it
@@ -89,6 +119,44 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
         when (currentRoute) {
             ROUTE_DEBUG -> DebugScanScreen(viewModel = viewModel, modifier = content)
 
+            ROUTE_ACTIONS -> {
+                val openDraft = draft
+                if (openDraft != null) {
+                    ActionEditorScreen(
+                        draft = openDraft,
+                        shades = savedShades,
+                        canDelete = actions.any { it.id == openDraft.id },
+                        onLabelChange = actionsViewModel::updateDraftLabel,
+                        onIconChange = actionsViewModel::updateDraftIcon,
+                        onFieldEnabled = actionsViewModel::setFieldEnabled,
+                        onFieldPercent = actionsViewModel::setFieldPercent,
+                        onSave = actionsViewModel::saveDraft,
+                        onCancel = actionsViewModel::cancelEdit,
+                        onDelete = {
+                            actionsViewModel.deleteAction(openDraft.id)
+                            actionsViewModel.cancelEdit()
+                        },
+                        modifier = content,
+                    )
+                } else {
+                    ActionsScreen(
+                        actions = actions,
+                        runs = runs,
+                        labelForMacAddress = labelForMacAddress,
+                        canCreate = savedShades.isNotEmpty(),
+                        onRun = actionsViewModel::runAction,
+                        onEdit = { actionId ->
+                            actionsViewModel.editAction(actionId, savedShades.map { it.macAddress })
+                        },
+                        onDelete = actionsViewModel::deleteAction,
+                        onCreate = {
+                            actionsViewModel.startNewAction(savedShades.map { it.macAddress })
+                        },
+                        modifier = content,
+                    )
+                }
+            }
+
             ROUTE_DETAIL -> {
                 val shade = requireNotNull(selectedShade) // guarded by currentRoute above
                 ShadeDetailScreen(
@@ -101,11 +169,11 @@ public fun PowerViewApp(viewModel: ShadeListViewModel, modifier: Modifier = Modi
                     commandOutcome = commands.outcomes[shade.macAddress],
                     onSave = { label, room, mainsPowered ->
                         viewModel.saveShade(shade.macAddress, label, room, mainsPowered)
-                        goToList()
+                        goToShades()
                     },
                     onForget = {
                         viewModel.forgetShade(shade.macAddress)
-                        goToList()
+                        goToShades()
                     },
                     onReadBattery = { viewModel.readBattery(shade.macAddress) },
                     onSendPosition = { primary, secondary, tilt ->

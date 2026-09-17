@@ -1,5 +1,6 @@
 package com.scrivtech.powerview.ui
 
+import com.scrivtech.powerview.data.ActionResult
 import com.scrivtech.powerview.data.CommandOutcome
 import com.scrivtech.powerview.data.Shade
 import com.scrivtech.powerview.protocol.CapabilityLookup
@@ -279,5 +280,67 @@ class ShadeFormattingTest {
         assertFalse(isWorthRetrying(CommandOutcome.NotAttempted.NoKeystream))
         assertFalse(isWorthRetrying(CommandOutcome.NotAttempted.BluetoothOff))
         assertFalse(isWorthRetrying(CommandOutcome.Sent))
+    }
+
+    // ---- actionResultText ----
+
+    private val mac1 = "C6:83:B4:47:08:51"
+    private val mac2 = "C6:83:B4:47:08:52"
+    private val names = mapOf(mac1 to "Kitchen window", mac2 to "Lounge door")
+    private fun name(mac: String) = names[mac] ?: mac
+
+    /**
+     * The case that matters until onboarding exists: every shade blocked for
+     * the same reason is one problem, not N failures, and listing six shades
+     * would send the user investigating six non-problems.
+     */
+    @Test
+    fun `an action blocked entirely on setup reports the cause once`() {
+        val result = ActionResult.Failed(
+            mapOf(
+                mac1 to CommandOutcome.NotAttempted.NoKeystream,
+                mac2 to CommandOutcome.NotAttempted.NoKeystream,
+            ),
+        )
+
+        val text = actionResultText(result, ::name)
+
+        assertEquals(commandOutcomeText(CommandOutcome.NotAttempted.NoKeystream), text)
+        assertTrue(text, !text.contains("Kitchen window"))
+    }
+
+    @Test
+    fun `an action blocked for differing reasons says so without picking one`() {
+        val result = ActionResult.Failed(
+            mapOf(
+                mac1 to CommandOutcome.NotAttempted.NoKeystream,
+                mac2 to CommandOutcome.NotAttempted.BluetoothOff,
+            ),
+        )
+
+        val text = actionResultText(result, ::name)
+
+        assertTrue(text, text.contains("Nothing was sent"))
+    }
+
+    /** Once BLE was actually attempted, the individual shades are the useful detail. */
+    @Test
+    fun `an action that reached the transport names the shades that failed`() {
+        val result = ActionResult.Failed(
+            mapOf(
+                mac1 to CommandOutcome.TransportFailed(CommandOutcome.TransportFailed.Stage.CONNECT),
+                mac2 to CommandOutcome.NotAttempted.NoKeystream,
+            ),
+        )
+
+        val text = actionResultText(result, ::name)
+
+        assertTrue(text, text.contains("Kitchen window"))
+        assertTrue(text, text.contains("Lounge door"))
+    }
+
+    @Test
+    fun `a successful action is reported plainly`() {
+        assertEquals("Sent.", actionResultText(ActionResult.Success, ::name))
     }
 }
