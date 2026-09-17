@@ -163,6 +163,34 @@ class WidgetPresentationTest {
 class TilePresentationTest {
 
     @Test
+    fun `a locked tile gives nothing away`() {
+        // Not the action's name, not whether the last run failed, not whether
+        // one is in flight. A tile is visible to whoever holds the phone.
+        for (hasAction in listOf(false, true)) {
+            for (run in SlotRun.entries) {
+                assertEquals(
+                    "hasAction=$hasAction run=$run",
+                    "Unlock to use",
+                    tileSubtitle(hasAction = hasAction, run = run, locked = true),
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a locked tile shows the generic name, never the action's`() {
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel("Bedroom close", locked = true))
+        assertEquals("Bedroom close", tileLabel("Bedroom close", locked = false))
+    }
+
+    @Test
+    fun `an unnamed or missing action falls back to the generic name`() {
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel(null, locked = false))
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel("", locked = false))
+        assertEquals(TILE_UNCONFIGURED_LABEL, tileLabel("   ", locked = false))
+    }
+
+    @Test
     fun `an unconfigured tile points at the app whatever the run state`() {
         // A deleted action and a never-chosen one are the same thing here:
         // nothing to run, and the same trip into the app to fix it.
@@ -170,23 +198,28 @@ class TilePresentationTest {
             assertEquals(
                 "run=$run",
                 "Choose an action in the app",
-                tileSubtitle(hasAction = false, run = run),
+                tileSubtitle(hasAction = false, run = run, locked = false),
             )
         }
     }
 
     @Test
-    fun `a configured tile reports its last run`() {
-        assertEquals("Tap to run", tileSubtitle(hasAction = true, run = SlotRun.IDLE))
-        assertEquals("Sending…", tileSubtitle(hasAction = true, run = SlotRun.PENDING))
-        assertEquals("Last run failed", tileSubtitle(hasAction = true, run = SlotRun.FAILED))
+    fun `an unlocked configured tile reports its last run`() {
+        assertEquals("Tap to run", tileSubtitle(hasAction = true, run = SlotRun.IDLE, locked = false))
+        assertEquals("Sending…", tileSubtitle(hasAction = true, run = SlotRun.PENDING, locked = false))
+        assertEquals(
+            "Last run failed",
+            tileSubtitle(hasAction = true, run = SlotRun.FAILED, locked = false),
+        )
     }
 
     @Test
     fun `every subtitle is non-blank`() {
-        for (hasAction in listOf(false, true)) {
-            for (run in SlotRun.entries) {
-                assertTrue(tileSubtitle(hasAction, run).isNotBlank())
+        for (locked in listOf(false, true)) {
+            for (hasAction in listOf(false, true)) {
+                for (run in SlotRun.entries) {
+                    assertTrue(tileSubtitle(hasAction, run, locked).isNotBlank())
+                }
             }
         }
     }

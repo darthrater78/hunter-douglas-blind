@@ -60,7 +60,11 @@ Both were written blind and both compiled first try, including through R8.
 has nowhere to put a picker, and its last-run state is in memory on purpose —
 there is one tile, so one value, and after a process death "last run failed"
 is stale news nobody can act on from a tile. It is reachable from the lock
-screen by design; the README's security notes say what that exposes.
+screen by design: a tap goes through `unlockAndRun` and a locked tile shows
+neither the action's name nor its last result. The spec asked for a
+lock-screen control and the user did not want one — if that ever reverses,
+the whole of it is `onClick` and the `locked` branch in `tileLabel` /
+`tileSubtitle`.
 
 **Step 9, the Glance widget.** One to six buttons per widget instance, a
 configuration activity to choose which saved actions they run, and results
@@ -292,7 +296,7 @@ inside the Compose files that use them.
 Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
 (`ActionResultTest`), 44 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
 `ThemeSelectionTest` 7, `TileActionDescriptionTest` 2), 20 in `:widget`
-(`WidgetPresentationTest` 17, `TilePresentationTest` 3).
+(`WidgetPresentationTest` 17, `TilePresentationTest` 6).
 
 Also verifiable locally: workflow files with `actionlint`.
 

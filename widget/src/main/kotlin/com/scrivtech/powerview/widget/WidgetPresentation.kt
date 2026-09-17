@@ -169,14 +169,31 @@ internal const val TILE_UNCONFIGURED_LABEL: String = "PowerView"
 /**
  * The tile's second line (API 29+).
  *
+ * [locked] wins over everything else, and deliberately so. A locked device
+ * gets no detail at all — not the action's name, not whether the last run
+ * failed — because the tile is visible to whoever is holding the phone and
+ * none of that is theirs to read. See [tileLabel].
+ *
  * [hasAction] is false both when nothing has been chosen and when the chosen
  * action has since been deleted. Those are the same thing from the tile's
  * point of view — there is nothing to run — and the fix for both is the same
  * trip into the app, so they read the same.
  */
-internal fun tileSubtitle(hasAction: Boolean, run: SlotRun): String = when {
+internal fun tileSubtitle(hasAction: Boolean, run: SlotRun, locked: Boolean): String = when {
+    locked -> "Unlock to use"
     !hasAction -> "Choose an action in the app"
     run == SlotRun.PENDING -> "Sending…"
     run == SlotRun.FAILED -> "Last run failed"
     else -> "Tap to run"
 }
+
+/**
+ * The tile's label: the action's name, unless the device is locked.
+ *
+ * A shade action is named after where it is and what it does — "Bedroom
+ * close", "Upstairs open" — so showing it on a lock screen tells a stranger
+ * holding the phone something about the house. The generic name costs the
+ * owner nothing, since they are one unlock away from the real one.
+ */
+internal fun tileLabel(actionLabel: String?, locked: Boolean): String =
+    if (locked || actionLabel.isNullOrBlank()) TILE_UNCONFIGURED_LABEL else actionLabel

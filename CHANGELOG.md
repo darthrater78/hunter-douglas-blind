@@ -72,10 +72,17 @@ All notable changes to this project are documented here.
   killed, "last run failed" is stale news the user cannot act on from a tile.
   The app is the record, which is what the failure subtitle points at.
 
+  **It does nothing from the lock screen.** The spec asked for a lock-screen
+  control, and it is not wanted: this tile moves physical objects in someone's
+  home, and a phone on a table should not be a remote for them. A tap goes
+  through `unlockAndRun`, which demands the lock screen first and runs
+  straight through when the device is already unlocked, so the owner pays
+  nothing for it. A locked tile also shows a generic name and "Unlock to use"
+  instead of the action's label — an action is named for where it is and what
+  it does, which is not a stranger's to read off a lock screen.
+
   Exported, like any tile, but bound behind `BIND_QUICK_SETTINGS_TILE` so only
-  the system can reach it. It is reachable from the lock screen by design —
-  see the README's security notes for what that does and does not expose, and
-  how to turn it off.
+  the system can reach it.
 
   `Tile.subtitle` is API 29, so it is guarded; below that the label carries
   everything and nothing is lost. `startActivityAndCollapse` is branched on

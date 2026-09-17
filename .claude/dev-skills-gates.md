@@ -43,7 +43,7 @@ Maven-Central-only Gradle project. Recipe and current file list are in
 `docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
 compile error before CI this session.
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 20 in `:widget`.
+Test counts: 40 in `:protocol`, 4 in `:data`, 44 in `:ui`, 23 in `:widget`.
 
 ## Security gate notes
 **This session's work is scanned and clean** (0 Critical / 0 High).
@@ -55,12 +55,11 @@ The tile's `<service>` is bound behind `android.permission.BIND_QUICK_SETTINGS_T
 so only the system can reach it despite being exported. Its `PendingIntent`
 (the API 34+ `startActivityAndCollapse` path) is `FLAG_IMMUTABLE`.
 
-**Accepted, not overlooked: the tile runs from the lock screen.** That is the
-point of a tile and what the spec asks for, but it means whoever holds the
-locked phone can move the shades that one action targets. It cannot read
-state, reveal anything, or reach the rest of the app. `unlockAndRun` is the
-mitigation if the user wants it; it is recorded in the README's security
-notes rather than decided unilaterally here.
+**Closed: the tile no longer works from the lock screen.** It was built to
+the spec's lock-screen requirement, the user said they did not want one, and
+it now goes through `unlockAndRun` — so nothing is sent until the device is
+unlocked. A locked tile also withholds the action's label and its last
+result, since an action is named for a room and a thing done to it.
 
 The two widget components: Both have to be exported — a widget
 receiver that is not exported never receives `APPWIDGET_UPDATE`, and the

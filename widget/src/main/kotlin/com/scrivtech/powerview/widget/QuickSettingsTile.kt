@@ -19,8 +19,15 @@ import kotlinx.coroutines.launch
 
 /**
  * A Quick Settings tile running one designated [ShadeAction] (build order
- * step 11, spec §3.5) — reachable from the lock screen, which is the point of
- * it.
+ * step 11, spec §3.5).
+ *
+ * **It does nothing from the lock screen, on purpose.** The spec asked for a
+ * lock-screen control and the user did not want one: this tile moves physical
+ * objects in someone's home, and a phone on a table should not be a remote
+ * for it. So a tap goes through [unlockAndRun], which demands the lock screen
+ * first and runs straight through when the device is already unlocked, and a
+ * locked tile shows a generic name rather than the action's — an action is
+ * named for where it is and what it does, which is not a stranger's to read.
  *
  * It goes through [CommandDispatch], exactly as a widget tap does, so the
  * tile is a second button on the same funnel rather than a second code path
@@ -53,25 +60,30 @@ public class QuickSettingsTile : TileService() {
     override fun onClick() {
         super.onClick()
 
-        scope.launch {
-            val actionId = SettingsStore(applicationContext).tileActionId.first()
+        // Nothing happens from the lock screen; see the class documentation.
+        // unlockAndRun is a no-op wrapper when the device is already unlocked,
+        // so this is not a second tap for the common case.
+        unlockAndRun { scope.launch { runDesignatedAction() } }
+    }
 
-            // Nothing designated, or it was deleted: the fix is in the app, so
-            // go there rather than leaving a tap that does nothing at all.
-            if (actionId == null || resolveAction(actionId) == null) {
-                openApp()
-                return@launch
-            }
+    private suspend fun runDesignatedAction() {
+        val actionId = SettingsStore(applicationContext).tileActionId.first()
 
-            // Same debounce reasoning as the widget: a second run costs
-            // another connect/disconnect cycle on the shade's own battery.
-            // CommandDispatch's unique work name is the backstop.
-            if (lastRun == SlotRun.PENDING) return@launch
-
-            lastRun = SlotRun.PENDING
-            CommandDispatch.enqueue(applicationContext, actionId)
-            render()
+        // Nothing designated, or it was deleted: the fix is in the app, so go
+        // there rather than leaving a tap that does nothing at all.
+        if (actionId == null || resolveAction(actionId) == null) {
+            openApp()
+            return
         }
+
+        // Same debounce reasoning as the widget: a second run costs another
+        // connect/disconnect cycle on the shade's own battery.
+        // CommandDispatch's unique work name is the backstop.
+        if (lastRun == SlotRun.PENDING) return
+
+        lastRun = SlotRun.PENDING
+        CommandDispatch.enqueue(applicationContext, actionId)
+        render()
     }
 
     override fun onDestroy() {
@@ -84,17 +96,21 @@ public class QuickSettingsTile : TileService() {
         // nothing to draw on, and onStartListening will come round again.
         val tile = qsTile ?: return
 
+        // Read once: isLocked can change underneath a render, and a label and
+        // subtitle that disagreed about it would be worse than either answer.
+        val locked = isLocked
+
         val actionId = SettingsStore(applicationContext).tileActionId.first()
         val action = actionId?.let { resolveAction(it) }
 
-        tile.label = action?.label ?: TILE_UNCONFIGURED_LABEL
-        tile.state = if (action != null && lastRun == SlotRun.PENDING) {
+        tile.label = tileLabel(actionLabel = action?.label, locked = locked)
+        tile.state = if (!locked && action != null && lastRun == SlotRun.PENDING) {
             Tile.STATE_ACTIVE
         } else {
             Tile.STATE_INACTIVE
         }
 
-        val subtitle = tileSubtitle(hasAction = action != null, run = lastRun)
+        val subtitle = tileSubtitle(hasAction = action != null, run = lastRun, locked = locked)
         // Tile.subtitle is API 29. Below that the label carries everything, so
         // there is nothing to fall back to and nothing lost.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
