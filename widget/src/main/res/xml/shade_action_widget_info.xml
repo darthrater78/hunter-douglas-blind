@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  minWidth/minHeight are one cell: the 1x1 single-button case is the point of
+  the widget, and the grid is the same provider resized rather than a second
+  one, so resizeMode covers both directions.
+
+  updatePeriodMillis is 0 deliberately — never poll. A widget that woke up on
+  a timer would connect to shades to find out nothing had changed, spending
+  the battery it is reporting on. Updates are pushed: from the tap callback,
+  and from CommandWorker when a run settles.
+
+  initialLayout is Glance's own loading layout, which is what it draws in the
+  moment between the widget being placed and the first composition.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="com.scrivtech.powerview.widget.WidgetConfigActivity"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="57dp"
+    android:minHeight="57dp"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable" />

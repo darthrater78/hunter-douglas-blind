@@ -2,6 +2,8 @@ package com.scrivtech.powerview.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -11,14 +13,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.scrivtech.powerview.data.SweepInterval
+import com.scrivtech.powerview.data.ThemeMode
 
 private const val ROUTE_SHADES = "shades"
 private const val ROUTE_DETAIL = "detail"
 private const val ROUTE_ACTIONS = "actions"
 private const val ROUTE_DEBUG = "debug"
+private const val ROUTE_SETTINGS = "settings"
 
 /**
  * The app's root. Screen state is a saved route string plus an optional MAC
@@ -38,6 +44,13 @@ private const val ROUTE_DEBUG = "debug"
 public fun PowerViewApp(
     viewModel: ShadeListViewModel,
     actionsViewModel: ActionsViewModel,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    tileActionId: String?,
+    onTileActionChange: (String?) -> Unit,
+    sweepInterval: SweepInterval,
+    onSweepIntervalChange: (SweepInterval) -> Unit,
+    onSweepNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var route by rememberSaveable { mutableStateOf(ROUTE_SHADES) }
@@ -86,6 +99,7 @@ public fun PowerViewApp(
                             currentRoute == ROUTE_DETAIL -> selectedShade?.label.orEmpty()
                             currentRoute == ROUTE_ACTIONS -> "Actions"
                             currentRoute == ROUTE_DEBUG -> "Raw scan"
+                            currentRoute == ROUTE_SETTINGS -> "Settings"
                             else -> "Shades"
                         },
                     )
@@ -103,12 +117,42 @@ public fun PowerViewApp(
                 },
                 actions = {
                     if (currentRoute == ROUTE_SHADES) {
-                        TextButton(onClick = { route = ROUTE_ACTIONS }) { Text("Actions") }
-                        // The debug screen stays reachable: it is the tool that
-                        // confirmed the advertisement offsets against hardware,
-                        // and the open questions in docs/PROTOCOL.md §8 mean it
-                        // is not finished being useful.
-                        TextButton(onClick = { route = ROUTE_DEBUG }) { Text("Raw scan") }
+                        // An overflow rather than a row of text buttons: there
+                        // are three destinations now, and three labels do not
+                        // fit an app bar on a phone. The project pulls in no
+                        // icon dependency, so the trigger is a word.
+                        var menuOpen by remember { mutableStateOf(false) }
+
+                        TextButton(onClick = { menuOpen = true }) { Text("More") }
+
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Actions") },
+                                onClick = {
+                                    menuOpen = false
+                                    route = ROUTE_ACTIONS
+                                },
+                            )
+                            // The debug screen stays reachable: it is the tool
+                            // that confirmed the advertisement offsets against
+                            // hardware, and the open questions in
+                            // docs/PROTOCOL.md §8 mean it is not finished being
+                            // useful.
+                            DropdownMenuItem(
+                                text = { Text("Raw scan") },
+                                onClick = {
+                                    menuOpen = false
+                                    route = ROUTE_DEBUG
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Settings") },
+                                onClick = {
+                                    menuOpen = false
+                                    route = ROUTE_SETTINGS
+                                },
+                            )
+                        }
                     }
                 },
             )
@@ -118,6 +162,18 @@ public fun PowerViewApp(
 
         when (currentRoute) {
             ROUTE_DEBUG -> DebugScanScreen(viewModel = viewModel, modifier = content)
+
+            ROUTE_SETTINGS -> SettingsScreen(
+                themeMode = themeMode,
+                onThemeModeChange = onThemeModeChange,
+                actions = actions,
+                tileActionId = tileActionId,
+                onTileActionChange = onTileActionChange,
+                sweepInterval = sweepInterval,
+                onSweepIntervalChange = onSweepIntervalChange,
+                onSweepNow = onSweepNow,
+                modifier = content,
+            )
 
             ROUTE_ACTIONS -> {
                 val openDraft = draft
