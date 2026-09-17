@@ -1,153 +1,145 @@
 # Dev Skills gate state
 Track: work commits (no version bump, no artifact publish, no release)
 Version: n/a — still pre-release, nothing tagged
-Updated: 2026-09-17 (end of session 2)
+Updated: 2026-09-17 (end of session 3)
 
-🔢 VERSION    ⬜ not owed on a work commit
-🔨 BUILD      ✅ green at branch head `05af903` (run #24, incl. R8)
-🔒 SECURITY   ✅ every session-2 diff scanned, 0 Critical / 0 High — see notes
-📄 DOCS       ✅ README, CHANGELOG, docs/PROTOCOL.md, docs/HANDOFF.md current
-📦 RELEASE    ⬜ no PR open for this branch; 7 Dependabot PRs target it
+🔢 VERSION    ➖ N/A on a work commit — no version bump, nothing tagged or published
+🔨 BUILD      ✅ green at branch head (CI; see notes — local build is structurally impossible)
+🔒 SECURITY   ✅ session-3 diffs scanned, 0 Critical / 0 High — see notes, including one honest gap
+📄 DOCS       ✅ CHANGELOG, docs/HANDOFF.md and this file rewritten for the dependency sweep
+📦 RELEASE    ⬜ nothing open; the Dependabot queue is cleared (6 merged, 1 closed)
 🚀 SHIP       ⬜ nothing tagged or released
 
 Environment: remote container (git executed by Claude after approval; tag
 pushes and ref deletions always presented to the user)
 Repo: https://github.com/darthrater78/hunter-douglas-blind
-Branch: claude/load-dev-skills-d0bioe
+Branch: claude/load-dev-skills-d0bioe — **this is the repository's default
+branch.** There is no `main` or `master` and no tags at all.
 
 ## Read this first
-`docs/HANDOFF.md` is the full state-of-play document: what is confirmed against
-real hardware versus assumed, the next step and the decision still open on it,
-how to verify pure-Kotlin code locally without an Android SDK, and what is
-blocked rather than skipped.
+`docs/HANDOFF.md` is the full state-of-play document. For this session, the
+section that matters is "The dependency sweep — done, and what it was hiding".
+
+## The track question, answered explicitly
+dev-skills §2 says anything that "merges to the default branch" is a release
+sequence needing all six gates. This branch *is* the default branch, so by the
+letter every dependency merge here is a release. They were treated as **work
+commits** instead, with the user's explicit agreement, on the grounds that
+nothing here bumps a version, produces an artifact, or publishes — the repo is
+pre-release scaffolding with no tags. This is recorded rather than assumed so
+the next session does not have to re-derive it or quietly grant itself the same
+exemption. If a real release is ever cut, creating a real `main` is the tidier
+fix.
 
 ## Build gate notes
-**Green at the branch head `05af903`** (run #24), including
-`assembleRelease` with R8. Every commit on this branch has been seen by a
-compiler.
+**Green at the branch head**, including `assembleRelease` with R8, where
+`lintVitalRelease` runs.
 
-Session 2 runs: #17 theme ✅, #18 Glance widget ✅, #20 tile ✅, #21 lock
-screen ✅, **#22 shortcuts ❌**, #23 battery widget + fix ✅, #24 sweep
-setting ✅.
+Session 3 ran the Dependabot queue to completion. Two real failures, both fixed
+forward rather than reverted or worked around:
 
-**Run #22 is the one real failure and it is fixed, not worked around.**
-`ActionShortcuts` was `internal` and `:app` calls it; `internal` is per
-Gradle module. The off-device harness compiles a single module, where
-`internal` always resolves, so it cannot catch this by construction — the
-grep that does is in `docs/HANDOFF.md` under "Verifying work without an
-Android SDK", and it must be run before any push that adds an `:app`
-reference into another module.
+- **Run #38** — AGP 9.4.0 rejected `org.jetbrains.kotlin.android`, because AGP
+  9 enables built-in Kotlin by default and the plugin becomes a hard error.
+  Fixed by the documented opt-out (`android.builtInKotlin=false`,
+  `android.newDsl=false`) rather than by the migration, because built-in Kotlin
+  compiles with AGP's bundled Kotlin and that has to agree with the Compose
+  compiler plugin pinned at 2.4.20 — unknowable here. **The migration is owed
+  and AGP 10.0 removes the opt-out.**
+- **A concurrency-group fix that did not work.** Widening `pull_request` to
+  `['**']` made it overlap `push`, and `head_ref || ref` does not collapse the
+  pair (`<branch>` vs `refs/heads/<branch>`). PRs #1 and #6 each built twice
+  before it was caught. It is `head_ref || ref_name` now.
 
-**What made the blind Glance commit compile first try** is worth repeating:
-every Glance signature was read from the AndroidX sources on GitHub
-(`raw.githubusercontent.com/androidx/androidx/androidx-main/glance/...`, which
-is reachable here even though Google Maven is not) rather than recalled. One
-fetch per signature beats one CI round trip per guess.
+**The local build gate is structurally impossible here and CI is the only
+compiler.** The network policy denies `dl.google.com`, and `maven.google.com`
+redirects there, so no AGP or AndroidX artifact resolves. Verify with
+`curl -sS "$HTTPS_PROXY/__agentproxy/status"`.
 
-The Android modules still cannot be compiled in this container (no SDK; Google
-Maven unreachable). What *can* be checked locally has grown, and is worth using:
-any file with no Android imports compiles and tests in an isolated
-Maven-Central-only Gradle project. Recipe and current file list are in
-`docs/HANDOFF.md` under "Verifying work without an Android SDK". It caught a
-compile error before CI this session — but see run #22 above for what it
-cannot catch, and the androidx-main-versus-pinned-version trap recorded
-alongside it.
+**But documentation hosts are reachable, and using them is the difference
+between one commit and three.** `developer.android.com`, `kotlinlang.org` and
+plain-git `github.com` all work. Reading
+`developer.android.com/build/migrate-to-built-in-kotlin` turned the AGP 9
+failure into one correct commit; `git ls-remote` on the action repos is what
+caught a pin labelled v4.4.4 while pointing at v4.4.3. Recipes are in
+`docs/HANDOFF.md` under "Verifying work without an Android SDK".
 
-Test counts: 40 in `:protocol`, 4 in `:data`, 47 in `:ui`, 50 in `:widget`.
+What *can* still be checked locally was used: the workflow YAML parses and its
+trigger set was asserted, and `libs.versions.toml` was parsed with `tomllib`
+after every edit. `actionlint` is not installed in the container, so CI's
+`actionlint` job remains the real check on the workflows.
 
 ## Security gate notes
-**This session's work is scanned and clean** (0 Critical / 0 High).
+**Session 3's diffs scanned, 0 Critical / 0 High.** The diffs are dependency
+versions, two workflow triggers, a concurrency key and two documented Gradle
+properties. No code changed — no new permission, component, network call,
+logging, crypto surface or persisted value.
 
-The widget (step 9) and tile (step 11) add **three exported components**,
-which is the thing here most worth a reviewer's attention.
+Specifically reviewed:
 
-Launcher shortcuts add a fourth component, `RunActionActivity`, and it is
-**not** exported — verified against AOSP rather than assumed. The system
-starts a shortcut's intent under the publishing app's identity, not the
-launcher's (`LauncherAppsService.startShortcutInner`: "Note the target
-activity doesn't have to be exported"), so the trampoline is reachable that
-way and no other. Exporting it by reflex would have let any installed app
-move the shades by firing an intent with an action id.
+- **`androidx.security:security-crypto` alpha06 → stable 1.1.0 is a security
+  improvement**, and the most valuable item in the queue: it guards the only
+  credential in the app and step 5 is about to put a real keystream behind it.
+  It does *not* settle whether `EncryptedSharedPreferences` is the right home
+  for the keystream — Jetpack has been steering away from it. **That call is
+  still owed before any real release.**
+- **Action pins were verified against upstream tags, not trusted.**
+  `actions/setup-java@de7274f` = v6.0.1 and `actions/upload-artifact@043fb46` =
+  v7.0.1, both resolved with `git ls-remote`. This is supply-chain review, and
+  it is not theoretical here: CI was dead for this project's entire history
+  because setup-gradle was pinned to a SHA in no tag at all.
+- **The widened `pull_request` trigger was checked for the fork-PR risk.** It
+  is `pull_request`, not `pull_request_target`, so a fork PR runs with a
+  read-only token against the *merge* commit and cannot reach secrets;
+  `ci.yml` declares `permissions: contents: read` and uses no secrets.
+  `release.yml`, which does handle signing secrets, triggers on tags only and
+  was not touched. No escalation.
 
-The tile's `<service>` is bound behind `android.permission.BIND_QUICK_SETTINGS_TILE`,
-so only the system can reach it despite being exported. Its `PendingIntent`
-(the API 34+ `startActivityAndCollapse` path) is `FLAG_IMMUTABLE`.
-
-**Closed: the tile no longer works from the lock screen.** It was built to
-the spec's lock-screen requirement, the user said they did not want one, and
-it now goes through `unlockAndRun` — so nothing is sent until the device is
-unlocked. A locked tile also withholds the action's label and its last
-result, since an action is named for a room and a thing done to it.
-
-The two widget components: Both have to be exported — a widget
-receiver that is not exported never receives `APPWIDGET_UPDATE`, and the
-launcher is what starts a configuration activity — so the question is what
-they accept. The receiver acts only on widget ids the system hands it. The
-configuration activity treats its `appWidgetId` extra as untrusted and checks
-it against the ids `GlanceAppWidgetManager` reports for this provider before
-writing anything, so another app cannot use it to rewrite a widget that is not
-ours; it holds no permission and exposes nothing beyond the user's own action
-labels. Neither touches BLE directly — both go through the existing
-`ActionRunner` funnel, which already never throws.
-
-Also new: `androidx.datastore.preferences`, `androidx.compose.runtime`,
-`compose-ui`, `material3`, `activity-compose` and `lifecycle-runtime-ktx` are
-now declared on `:widget`. No new artifact enters the build — every one was
-already resolved for another module, and they are declared here because this
-module's own code names them rather than relying on another module's
-`implementation` deps leaking onto the compile classpath.
-
-The theme work adds no dependency, no permission, no network or crypto
-surface, no logging and no exported component; the one new persisted value is a theme name in its own
-`app_settings` DataStore, which falls back to `SYSTEM` on an unrecognised
-value rather than throwing. It is deliberately a separate DataStore from the
-shade and action stores so a corrupt settings blob costs a theme choice rather
-than a shade list. Backup rules need no change — the denylist excludes only
-`shade_keystreams.xml`, and a theme preference is right to restore.
+**The honest gap: no dependency audit tool was run, and none can be.** §4.1
+wants the ecosystem's audit run against the current lockfile at every security
+gate. There is no lockfile (see below), and Gradle cannot resolve the Android
+dependency tree here at all, so no CVE check covers the AndroidX/AGP tree. What
+this session has instead is that every pin is now the current release, which
+lowers exposure but does not measure it. **Run a real audit from a machine with
+Google Maven before any release.**
 
 The full audit (1 Critical, 5 High, 11 Medium, 4 Low; all Critical and High
-fixed) was run last session and covers the code as it stood then. **This session
-added roughly 2,000 lines — five new UI screens, two view models, a notification
-path and a background worker — none of which that audit saw.** Re-run before any
-release.
+fixed) predates roughly 2,000 lines of session-2 UI code that it never saw —
+five screens, two view models, a notification path and a background worker.
+Session 3 added no code at all, so that gap is unchanged and still owed.
+Standing properties hold by inspection: no network code, no logging, no
+eval/exec/reflection/SQL/WebView, keystream in EncryptedSharedPreferences and
+excluded from backup, `.gitignore` covers signing material.
 
-Standing properties still hold by inspection: no network code anywhere, no
-logging of any kind, no eval/exec/reflection/SQL/WebView, one exported component
-(the launcher activity), keystream in EncryptedSharedPreferences and excluded
-from backup and device transfer, `.gitignore` covers signing material. The only
-key-like literal in the repo is the openHAB project's published AES test vector,
-in `:protocol` test sources.
-
-New surface a re-audit should look at specifically:
-- `POST_NOTIFICATIONS` is now declared and `BatteryNotifier` posts. It re-checks
-  the grant at runtime and stays silent without it.
-- `BatterySweepWorker` connects to every non-mains shade weekly. It bails out
-  early without `BLUETOOTH_CONNECT` rather than attempting doomed connections.
-- `ActionRunner` moved to `:data` and now returns typed outcomes. It still
-  never throws, which is the property the widget/worker callers depend on.
-
-Three Medium items remain open and are blocked rather than skipped — Gradle
-dependency locking, `verification-metadata.xml`, and the currency (not validity)
-of the AGP/AndroidX pins. All need Google Maven. A fourth is worth raising in
-priority: `androidx.security:security-crypto` is still at `1.1.0-alpha06`, and
-step 5 is about to put a real keystream behind it.
+Three exported components (widget receiver, widget config activity, tile
+service) and one deliberately unexported trampoline (`RunActionActivity`)
+remain the surface most worth a reviewer's attention; the reasoning for each is
+in session 2's notes and unchanged.
 
 ## Release gate notes
-`release.yml` will fail by design until `KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
-`KEY_ALIAS` and `KEY_PASSWORD` are set: without them the build produces an
-unsigned APK that Android cannot install, and the workflow refuses to publish
-one. CI uploads a debug-signed APK on every push, and it is now worth installing
-— the app has a real UI, and everything except moving a shade works.
+`release.yml` still fails by design until `KEYSTORE_BASE64`,
+`KEYSTORE_PASSWORD`, `KEY_ALIAS` and `KEY_PASSWORD` are set: without them the
+build produces an unsigned APK that Android cannot install, and the workflow
+refuses to publish one. CI uploads a debug-signed APK on every push.
+
+**That APK is now worth installing for a specific reason**, not just to browse:
+the Compose BOM moved two years in one commit and the OLED theme leans on the
+Material 3 `surfaceContainer` roles. Green means it compiles. Nobody has looked
+at it.
 
 ## Note for the next session
-Commit approval does not carry across sessions. Session 2 was granted a
-standing approval for its work commits; that expired with the session. **Ask
-again.**
+Commit approval does not carry across sessions. Session 3 was granted a
+standing approval for its work commits; that expired with it. **Ask again.**
 
-**Start with the Dependabot queue.** Seven PRs are open against this branch
-and were listed but not read. `docs/HANDOFF.md` has the table, a suggested
-order and the reasoning — PR #5 (security-crypto alpha → stable) is the
-highest-value one, and #3/#4 (Gradle 9 + AGP 9) are coupled and must go
-together. Per dev-skills §4.1 each major is its own change with its own
-gates. None of them can be validated locally: Google Maven is unreachable
-from the container, so CI is the only judge.
+**Start with step 5** — it is the only build-order work left, and the user has
+twice reconfirmed it stays last in the ordering, so it is now simply next. The
+decision still open on it (which of the three onboarding paths to build first,
+with import-a-known-key the standing recommendation) is in `docs/HANDOFF.md`.
+
+Two follow-ups the dependency sweep left behind. Neither blocks step 5, and
+neither is something CI can answer:
+
+1. **The built-in Kotlin migration**, before AGP 10.0 removes the opt-out. The
+   steps are recorded in `gradle.properties` beside the flags; the open
+   question is whether the Compose plugin pin must move with AGP's bundled
+   Kotlin.
+2. **Look at the app under the Black (OLED) theme** after the Compose BOM jump.

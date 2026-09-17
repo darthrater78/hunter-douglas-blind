@@ -4,6 +4,67 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+### Build and dependencies
+
+The seven Dependabot PRs that had been sitting against the default branch were
+read, built and resolved. Six merged, one was superseded and closed. The order
+they had been queued in turned out to be wrong, for a reason worth recording.
+
+- **Four of the seven had never been built by anything.** Their base predated
+  `ci.yml`'s `push: branches: ['**']`, and the `pull_request` trigger was
+  scoped to `[main, master]` — branches this repository does not have, since
+  its default branch is the one the work is on. Neither trigger matched, so
+  those PRs showed an *empty* check list rather than a red one, which reads far
+  too much like success. The trigger is now `['**']` on both.
+- **"minor-and-patch" did not mean low risk.** Every bump in that group (#1)
+  failed, because `androidx.core:core-ktx:1.19.0` requires AGP ≥ 9.1.0 and
+  `compileSdk` ≥ 37. A minor bump of a library can demand a major bump of the
+  build plugin, and the group name says nothing about it. The Compose BOM (#6)
+  failed identically, 22 artifacts over.
+- **Gradle 9 and AGP 9 are not coupled in both directions.** `docs/HANDOFF.md`
+  said AGP 8.7.3 would not run on Gradle 9, so the two had to move together as
+  one large piece of work, last. Gradle 9.7.1 built green on AGP 8.7.3. The
+  dependency runs one way only — AGP 9.4.0 requires Gradle ≥ 9.6.0 — so the
+  wrapper went first, alone, and made the AGP bump a separately-gated change.
+- **`androidx.security:security-crypto` reached a stable 1.1.0** (#5) and, in
+  the event, needed none of the above. It guards the only credential in the
+  app and step 5 is about to put a real keystream behind it, which makes it the
+  most valuable item in the queue; it merged first. Whether
+  `EncryptedSharedPreferences` is the right home for the keystream at all is
+  still open.
+- **AGP 9.4.0 landed with built-in Kotlin deliberately switched off.** AGP 9
+  enables built-in Kotlin by default, which makes applying
+  `org.jetbrains.kotlin.android` a hard error. The documented migration is
+  small, but it hands compilation to the Kotlin that AGP bundles, and that
+  version has to agree with the Compose compiler plugin pinned at 2.4.20 —
+  unknowable from a container where Google Maven is blocked. So
+  `android.builtInKotlin=false` and `android.newDsl=false` keep the known-good
+  pairing and let the AGP major stand alone. **This is temporary: AGP 10.0
+  removes the opt-out**, and the steps are recorded beside the flags.
+- **`compileSdk` is 37; `targetSdk` stays 35.** `compileSdk` decides which APIs
+  the code may call and is what the AndroidX artifacts demanded. `targetSdk`
+  opts the app in to new runtime behaviour, wants testing on hardware, and this
+  app cannot yet move a shade. It is a release decision with its own gate.
+- **Also taken:** the Gradle wrapper at 9.7.1 (#3), JUnit 6.1.3 for
+  `:protocol`'s tests (#2), and `actions/setup-java` v6.0.1 and
+  `actions/upload-artifact` v7.0.1 (#8), whose SHAs were resolved against the
+  upstream tags rather than trusted from their comments. The
+  `gradle/actions/setup-gradle` pin was labelled `# v4.4.4` while pointing at
+  v4.4.3, both before and after that PR; the label is corrected rather than the
+  pin moved, because the label is what Dependabot reads to decide what to offer
+  next, and gradle/actions is on v6.0.1 now.
+- **Duplicate CI runs collapse properly.** Widening the `pull_request` trigger
+  made it overlap the `push` trigger, and the first attempt at a shared
+  concurrency group (`head_ref || ref`) silently did not work — `<branch>`
+  versus `refs/heads/<branch>` are different strings, and PRs #1 and #6 each
+  built twice. It is `head_ref || ref_name` now.
+
+Still owed, and neither is something CI can answer: the built-in Kotlin
+migration before AGP 10, and a **visual check of the Compose BOM jump** — two
+years of Material 3 moved at once, and the OLED theme leans on the
+`surfaceContainer` roles and `surfaceTint`. Green means it compiles, not that
+it still looks right.
+
 ### Changed
 - **The shades app bar's two text buttons became a `More` overflow menu.**
   Three destinations (Actions, Raw scan, Settings) do not fit as three labels

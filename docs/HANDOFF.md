@@ -1,10 +1,12 @@
 # Handoff
 
-Written 2026-09-17, rewritten the same day at the end of a second session.
-Branch `claude/load-dev-skills-d0bioe` at `05af903`, green in CI (run #24)
-— not merged, no PR open for it, no release tagged. Seven Dependabot PRs are
-open against it and are the first thing to deal with; see "The Dependabot
-queue" below.
+Written 2026-09-17, rewritten the same day at the end of a third session.
+Branch `claude/load-dev-skills-d0bioe` — which is this repository's **default
+branch**, not a feature branch; there is no `main` or `master` and no tags at
+all — green in CI, with no release tagged. **The Dependabot queue is cleared:**
+six PRs merged, one closed as superseded, nothing open. Step 5 is now the only
+thing left; see "The dependency sweep" below for what the queue turned out to
+be hiding.
 
 This is the state-of-play document for whoever picks the project up next. The
 README describes what the app is meant to be; this describes what is actually
@@ -30,9 +32,11 @@ it forward; steps 9 and 11 are built around it, and step 6 is really part of
 onboarding anyway. The UI is built to say so
 out loud rather than failing opaquely — see "The no-keystream state" below.
 
-**Two things are waiting, in this order.** Seven Dependabot PRs are open
-against this branch and were reviewed only as a list, not read — that section
-is below and is the first thing to pick up. Then step 5.
+**One thing is waiting: step 5.** The Dependabot queue that used to sit in
+front of it is done. Two follow-ups it left behind are real but neither blocks
+step 5, and both are things CI cannot answer — the built-in Kotlin migration
+before AGP 10, and a visual check of the Compose BOM jump against the OLED
+theme. Both are described under "The dependency sweep".
 
 Build order progress (numbering follows the README):
 
@@ -268,58 +272,133 @@ reason to distrust anything else inherited from that binding.**
 
 ---
 
-## The Dependabot queue — deal with this first
+## The dependency sweep — done, and what it was hiding
 
-**Seven Dependabot PRs are open, and every one targets this feature branch**
-rather than the default branch, because that is where Dependabot was pointed.
-They were opened before most of this session's commits, so their bases are
-stale and some will conflict.
+**All seven Dependabot PRs are resolved.** Six merged, #4 closed as superseded.
+Nothing is open. The previous version of this document laid out a suggested
+order and called it "a plan, not a verdict" — which was the right caution,
+because the plan was wrong in three places and only building them showed it.
 
-They were listed but **not read** at the end of the session — the diffs and
-their CI results are unexamined, so treat the grouping below as a plan, not a
-verdict.
-
-| PR | Bump | Kind |
+| PR | Bump | Outcome |
 |---|---|---|
-| #1 | `minor-and-patch` group, 5 updates (gradle) | minor/patch |
-| #8 | `actions` group, 3 updates (github_actions) | CI action SHAs |
-| #5 | `androidx.security:security-crypto` 1.1.0-alpha06 → **1.1.0** | alpha → stable |
-| #6 | `androidx.compose:compose-bom` 2024.12.01 → **2026.09.00** | ~2 years |
-| #2 | `org.junit.jupiter:junit-jupiter` 5.11.4 → **6.1.3** | major |
-| #3 | `gradle-wrapper` 8.14.3 → **9.7.1** | major |
-| #4 | `agp` 8.7.3 → **9.4.0** | major |
+| #5 | security-crypto `1.1.0-alpha06` → `1.1.0` | merged first — needed nothing else |
+| #2 | junit-jupiter `5.11.4` → `6.1.3` | merged |
+| #8 | `actions` group ×3 | merged |
+| #3 | gradle-wrapper `8.14.3` → `9.7.1` | merged |
+| #4 | agp `8.7.3` → `9.4.0` | closed; landed directly instead |
+| #1 | `minor-and-patch` ×5 | merged, after AGP 9 + compileSdk 37 |
+| #6 | compose-bom → `2026.09.00` | merged, same |
 
-Suggested order, and why:
+### The three things the plan got wrong
 
-1. **#5 first.** It is the one flagged in "Blocked, not skipped" below: the
-   alpha guards the only credential in the app, and step 5 is about to put a
-   real keystream behind it. An alpha → stable release on the same version
-   line is the cheapest possible fix for a real concern.
-2. **#1 and #8.** Low risk by definition, and #1 clears a pile of
-   `UNVERIFIED` markers in `gradle/libs.versions.toml`.
-3. **#6 on its own.** "compose-bom" understates it: nearly two years of
-   Material 3. The OLED theme leans on the `surfaceContainer` roles and
-   `surfaceTint`, so this is the change most likely to alter how the app
-   *looks* rather than whether it builds. Give it its own commit and its own
-   look at a debug APK.
-4. **#3 and #4 together, and last.** Gradle 9 and AGP 9 are coupled — AGP
-   8.7.3 will not run on Gradle 9 — so merging either alone breaks the build.
-   Expect `compileSdk`/`targetSdk` to move with them. This is a real piece of
-   work, not a version bump, and the README already flags `targetSdk 35` as
-   likely at or below the Play Store floor by now.
-5. **#2** is a major (JUnit 6) and affects only `:protocol`'s test
-   dependency. Harmless to defer, harmless to take early; it just needs its
-   own gate rather than riding along with something else.
+**1. Four of the seven had never been built.** Not red — *empty*. Their base
+predated `ci.yml`'s `push: branches: ['**']`, and the `pull_request` trigger
+read `branches: [main, master]`, which matches nothing in a repository whose
+default branch is `claude/load-dev-skills-d0bioe`. Neither trigger fired. An
+empty check list reads like "fine" in a way a red X never does, and that is how
+#1 and #8 came to be described as "low risk by definition" without a verdict
+behind either. Both triggers are `['**']` now.
 
-Two things to keep in mind while working through them. `dev-skills` §4.1 is
-explicit that a major-version bump is its own change with its own gates and
-is never folded silently into an unrelated PR. And **nothing here can be
-resolved locally** — Google Maven is unreachable from the container, so CI is
-the only thing that can tell you whether a bump works.
+If you ever need a verdict on a stale PR here: GitHub's "Update branch" works
+(`update_pull_request_branch`), and it fires a push event that CI does answer.
+`@dependabot rebase` does **not** work from an agent — the mention is stripped
+before it reaches Dependabot.
+
+**2. "minor-and-patch" said nothing about risk.** Every bump in #1 failed, and
+so did all 22 artifacts in #6, on the same condition: the AndroidX artifacts
+require AGP ≥ 9.1.0 *and* `compileSdk` ≥ 37. A minor bump of a library can
+demand a major bump of the build plugin. So #1 and #6 were not the easy
+warm-up items — they were downstream of the hardest one, and the queue's real
+shape was the opposite of the order it was written in.
+
+**3. Gradle 9 and AGP 9 are coupled one way, not both.** This document
+previously said "AGP 8.7.3 will not run on Gradle 9 — so merging either alone
+breaks the build", and held both back as one large change. Gradle 9.7.1 built
+green on AGP 8.7.3. The real constraint, from #4's own failure, is:
+
+```
+Minimum supported Gradle version is 9.6.0. Current version is 8.14.3.
+```
+
+AGP 9 needs Gradle ≥ 9.6.0; Gradle 9 does not need AGP 9. So the wrapper went
+first, alone, and the AGP major became a separately-gated change instead of a
+two-major migration landing at once. That claim was inherited rather than
+measured — the same failure mode this project has already recorded twice
+against the openHAB binding.
+
+### AGP 9 landed with built-in Kotlin switched off
+
+AGP 9.0 enables built-in Kotlin by default, which turns applying
+`org.jetbrains.kotlin.android` into a hard error rather than a redundancy. Five
+modules apply it, plus the root build file, so the documented migration is
+genuinely small — delete six lines and the catalog entry.
+
+It was **not** taken, and the reason matters. Built-in Kotlin compiles with the
+Kotlin that AGP bundles, and that has to agree with the Compose compiler plugin
+pinned at the catalog's `kotlin = 2.4.20`. Which Kotlin AGP 9.4.0 bundles
+cannot be established from this container at all, so taking it would have been
+a guess costing a CI round trip on the default branch. `android.builtInKotlin=false`
+and `android.newDsl=false` keep the pairing that already builds green.
+
+**This is owed, with a hard deadline: AGP 10.0 removes the opt-out.** The steps
+are recorded in `gradle.properties` beside the flags, and the one open question
+is whether the Compose plugin pin must move with AGP's bundled Kotlin. Guide:
+https://developer.android.com/build/migrate-to-built-in-kotlin
+
+### compileSdk 37, targetSdk still 35
+
+`compileSdk` is 37 because the AndroidX artifacts demanded it. `targetSdk`
+stays at 35 deliberately: it opts the app in to new *runtime* behaviour and
+wants testing on a device, and this app cannot yet move a shade. The README
+flags targetSdk 35 as likely at or below the Play Store floor — real, and a
+release decision with its own gate, not part of a dependency sweep. The
+reasoning is pinned beside the value in `libs.versions.toml` so the gap does
+not read as an oversight.
+
+### The one check nobody has run
+
+**The Compose BOM jump is verified only as "it compiles".** 2024.12.01 →
+2026.09.00 is close to two years of Material 3 across 22 artifacts, and the
+OLED theme leans on the `surfaceContainer` roles and `surfaceTint` — exactly
+the kind of thing that shifts over that span. Nothing in the container can
+render a screen.
+
+Install the debug APK CI uploads and look at the shade list, the detail screen
+and the settings screen under **Black (OLED)** and under **Light**, at
+container backgrounds and at whether the OLED scheme's deliberately-not-black
+containers still read as intended. It is its own commit, so a revert is cheap
+if they do not.
+
+### Action pins, and a lesson that repeats
+
+`actions/setup-java` v6.0.1 and `actions/upload-artifact` v7.0.1 were taken
+after resolving both SHAs against the upstream tags directly, rather than
+trusting the comments beside them. The `gradle/actions/setup-gradle` pin was
+labelled `# v4.4.4` while pointing at **v4.4.3**, both before and after #8 —
+Dependabot moved it from the annotated tag object to the commit, which is the
+correct form, and carried the wrong label across. The label was corrected down
+to v4.4.3 rather than the pin moved up, because the label is what Dependabot
+reads to decide what to offer next; gradle/actions is on v6.0.1 now, so expect
+an offer.
+
+This is the third time a pin comment has mattered in this repository. CI here
+was dead for the project's entire history because setup-gradle was pinned to a
+SHA in no tag at all. Resolve the SHA; do not read the comment.
+
+### Note on this branch being the default branch
+
+`claude/load-dev-skills-d0bioe` is the repository's default branch. There is no
+`main`, no `master`, and no tags. That is why Dependabot targets it without any
+`target-branch` setting in `dependabot.yml`, and it is worth knowing before
+applying any rule that says "merges to the default branch are releases" — by
+the letter, every dependency merge here is one. They were treated as work
+commits, which is the honest reading while nothing is versioned, tagged or
+published. If a real release is ever cut, creating a real `main` is the tidier
+fix.
 
 ---
 
-## Next step after that: step 5 — everything else is done
+## Next step: step 5 — everything else is done
 
 **Step 5 stays last.** It was deferred deliberately, and the user reconfirmed
 that when this session offered to start it. An earlier version of this
@@ -426,8 +505,33 @@ hard errors. `BatteryLevel`/`batteryLevelOf`
 live inside `BatteryReader.kt`, which imports Android, so the harness needs a
 small verbatim copy of just those declarations.
 
-This paid for itself this session: it caught a compile error in a new test file
-before CI saw it. **When you write new logic, put the pure part in a file with no
+**What is reachable from here, precisely — it is not "no Google".** The
+network policy denies `dl.google.com`, and `maven.google.com` 301-redirects
+there, so no AndroidX or AGP artifact or POM can be fetched and Gradle cannot
+resolve an Android build. Confirm it yourself with
+`curl -sS "$HTTPS_PROXY/__agentproxy/status"`, which logs the rejected CONNECT.
+
+But Google's *documentation* host is fine. `developer.android.com` and
+`kotlinlang.org` both serve normally, and so does `github.com` over plain git —
+`git ls-remote https://github.com/<owner>/<repo>` resolves any action's tags,
+which is how the setup-gradle pin was caught pointing at v4.4.3 under a v4.4.4
+label.
+
+That distinction earned its keep in the third session. AGP 9 failed CI on the
+`kotlin-android` plugin, and the obvious reflex — delete the plugin from six
+files — would have been wrong in a way CI would have taken two more round trips
+to reveal. Fetching
+`developer.android.com/build/migrate-to-built-in-kotlin` instead showed both
+the migration *and* the documented opt-out, and the note that built-in Kotlin
+compiles with AGP's bundled Kotlin, which is what makes the Compose plugin pin
+a live question. One fetch, one correct commit.
+
+So: **artifacts no, documentation yes.** Read the docs before guessing at an
+API or a migration, exactly as the Glance work did against the AndroidX
+sources.
+
+This paid for itself in an earlier session too: the harness caught a compile
+error in a new test file before CI saw it. **When you write new logic, put the pure part in a file with no
 Android imports so it can be checked this way.** That is why `groupIntoRooms`
 and the outcome-wording functions live in `ShadeFormatting.kt` rather than
 inside the Compose files that use them.
@@ -459,23 +563,35 @@ Also verifiable locally: workflow files with `actionlint`.
 
 ## CI status
 
-**Green on the branch head**, `05af903`, run #24 — including
-`assembleRelease` with R8, which is where `lintVitalRelease` runs. Every
-commit on this branch has now been seen by a compiler.
+**Green on the branch head**, including `assembleRelease` with R8, which is
+where `lintVitalRelease` runs. Every commit on this branch has been seen by a
+compiler.
 
-Runs this session: #17 theme ✅, #18 widget ✅, #20 tile ✅, #21 lock screen
-✅, **#22 shortcuts ❌**, #23 battery widget + fix ✅, #24 sweep setting ✅.
+The third session's runs went #33–#37 ✅ (the Dependabot merges, most of them
+cancelled by the next merge landing — see below), **#38 ❌ AGP 9**, #39 ✅ the
+built-in Kotlin opt-out, #40 ✅ compileSdk 37, then the #1 and #6 merges.
 
-Run #22 is the only genuine failure in the branch's history and it is fixed,
-not papered over: `ActionShortcuts` was `internal` where `:app` needed it
-public. See "The red build" above for why the local harness could not have
-caught it.
+Two genuine failures exist in this branch's history and both are fixed rather
+than papered over:
 
-The `cancelled` runs (`3fe7a27`, `e0d459b`, and any run whose push was
-quickly followed by another) are **not** failures. CI sets
-`cancel-in-progress: true` on a per-ref concurrency group, so a run dies when
-the next push starts. If you push twice in quick succession, read the *later*
-run.
+- **#22**, `ActionShortcuts` was `internal` where `:app` needed it public. See
+  "The red build" above for why the local harness cannot catch that class of
+  error at all.
+- **#38**, AGP 9.4.0 rejecting the `org.jetbrains.kotlin.android` plugin. Fixed
+  forward in the next commit rather than reverted, because the cause was
+  named precisely in the log and the fix was a documented flag. See "The
+  dependency sweep" above.
+
+The `cancelled` runs are **not** failures. CI sets `cancel-in-progress: true`
+on its concurrency group, so a run dies when the next push to the same branch
+starts. Merging six PRs in quick succession produced a row of them. If you push
+twice in quick succession, read the *later* run.
+
+That group is now keyed on `github.head_ref || github.ref_name` — note
+`ref_name`, not `ref`. The `pull_request` trigger overlaps `push` in this
+repository, and `head_ref || ref` does *not* collapse the pair (`<branch>`
+versus `refs/heads/<branch>`), which quietly cost a duplicate build on every
+pull request until it was caught.
 
 ```
 https://github.com/darthrater78/hunter-douglas-blind/actions
@@ -489,25 +605,26 @@ These were identified in the audit and cannot be completed from the sandbox:
   generated from a successful dependency resolution, which needs Google Maven.
   Worth doing from a normal dev machine — it is the only way to get a lockfile
   to audit against.
-- **Currency of the pinned versions — now answered, and waiting in PRs.**
-  `gradle/libs.versions.toml` still marks AGP and the AndroidX entries
-  `UNVERIFIED`, meaning "known to work, not known to be current". Dependabot
-  has since said what *is* current, so the open question has become a queue
-  of seven PRs rather than an unknown. Delete each `UNVERIFIED` marker as its
-  bump lands. See "The Dependabot queue" above.
-- **`androidx.security:security-crypto` is at `1.1.0-alpha06`**, and it guards
-  the only credential in the app. Jetpack has been steering away from
-  `EncryptedSharedPreferences`. **PR #5 bumps it to a stable 1.1.0** and is
-  the single highest-value item in the queue — this gets more pressing the
-  moment step 5 puts a real keystream behind it. A stable release does not
-  settle the larger question of whether `EncryptedSharedPreferences` is the
-  right home for the keystream at all; make that call before a real release.
+- **Currency of the pinned versions — answered.** The whole Dependabot queue
+  is merged, so AGP, the Gradle wrapper, the AndroidX entries and the action
+  pins are current as of 2026-09-17. `UNVERIFIED` markers were deleted as each
+  bump landed. What the marker never meant is still worth keeping in mind: it
+  said "known to work, not known to be current", and a green build says
+  nothing about currency either. Dependabot is the thing that keeps answering
+  this between security gates — leave it pointed here.
+- **`androidx.security:security-crypto` is on the stable `1.1.0`** as of PR #5.
+  That closes the alpha concern, which was pressing because step 5 is about to
+  put a real keystream behind it. It does **not** settle the larger question:
+  Jetpack has been steering away from `EncryptedSharedPreferences` entirely,
+  and whether it is the right home for the keystream is a call still owed
+  before a real release.
 - **`navigation-compose` is in the version catalog but referenced by no module**,
   so its pin has never been resolved by any build. Screen state is currently a
   saved route string plus a MAC in `PowerViewApp` — deliberate, and less code
   than a `NavHost` at this size. If the screen graph grows, switching is easy,
   but expect the first build that references it to be the one that discovers
-  whether 2.8.5 resolves against the pinned Compose BOM.
+  whether 2.10.1 resolves against the pinned Compose BOM. It rode along in PR
+  #1 and is therefore the one bump in that group that nothing has verified.
 
 ---
 
