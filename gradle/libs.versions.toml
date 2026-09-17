@@ -13,7 +13,7 @@
 
 [versions]
 # Build tooling
-agp = "8.7.3" # UNVERIFIED — 9.4.0 is current and now unblocked: it needs Gradle >= 9.6.0 and the wrapper is 9.7.1
+agp = "9.4.0" # Dependabot-reported current (PR #4); needs Gradle >= 9.6.0, wrapper is 9.7.1
 kotlin = "2.4.20" # VERIFIED — Maven Central, org.jetbrains.kotlin:kotlin-gradle-plugin
 compileSdk = "35" # UNVERIFIED — confirm latest stable Android API level
 targetSdk = "35" # UNVERIFIED
