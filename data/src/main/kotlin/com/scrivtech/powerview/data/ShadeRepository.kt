@@ -95,6 +95,8 @@ public class ShadeRepository(
                 capabilities = capability,
                 homeId = advertisement.shadeState.homeId,
                 lastSeenAt = Instant.ofEpochMilli(advertisement.timestampMillis),
+                lastRssi = advertisement.rssi,
+                lastRawPayloadHex = advertisement.rawPayloadHex,
             )
             current + (advertisement.macAddress to updated)
         }
@@ -129,5 +131,7 @@ public class ShadeRepository(
         batteryBucket = null,
         batteryReadAt = null,
         mainsPowered = false,
+        lastRssi = null,
+        lastRawPayloadHex = null,
     )
 }

@@ -21,7 +21,8 @@ import com.scrivtech.powerview.ui.ShadeListViewModel
 public class MainActivity : ComponentActivity() {
 
     private val viewModel: ShadeListViewModel by viewModels {
-        ShadeListViewModel.Factory((application as PowerViewApplication).shadeRepository)
+        val app = application as PowerViewApplication
+        ShadeListViewModel.Factory(app.shadeRepository, app.batteryReader)
     }
 
     private val requestBlePermissions = registerForActivityResult(

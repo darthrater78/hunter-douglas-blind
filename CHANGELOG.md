@@ -30,6 +30,28 @@ All notable changes to this project are documented here.
 - CI (`.github/workflows/ci.yml`), release (`.github/workflows/release.yml`),
   and Dependabot (`.github/dependabot.yml`) workflows.
 
+### Added
+- Battery status (build order step 4, spec §2.5). `BatteryReader` connects over
+  GATT, reads the standard Battery Service (`0x180F` / `0x2A19`), persists the
+  reading to `ShadeStore` and disconnects. No keystream is involved — the
+  battery characteristic is unencrypted. The value is a coarse low/medium/high
+  bucket, not a charge percentage, and is rendered as such. Reads are on demand
+  from the debug screen rather than polled, because connecting costs the shade
+  power; the weekly sweep and low-battery notifications (step 10) are a
+  scheduled caller on top of this, still to come.
+- The debug screen now shows what build order step 2 actually calls for: RSSI,
+  the raw advertisement payload in hex, and the velocity byte. Decoded fields
+  alone only show the parser's opinion of the bytes — confirming an offset
+  against real hardware means seeing the hex they came from.
+- Scan status is surfaced (Scanning / Stopped / Failed, with the reason) plus a
+  retry button and a real empty state. A denied `BLUETOOTH_SCAN`, a disabled
+  adapter and "nothing in range" previously all rendered as the same blank
+  screen, leaving the debug screen unable to explain the one thing it exists
+  to explain.
+- Fields a shade's capability says it does not have are now labelled as such,
+  so a decoded value from an unused byte is not mistaken for a real position
+  (e.g. tilt on a top-down/bottom-up shade).
+
 ### Fixed
 - **CI and releases could never succeed**: `gradle/actions/setup-gradle` was
   pinned to `ac638b0…`, a SHA that exists in no tag of that repository (and is

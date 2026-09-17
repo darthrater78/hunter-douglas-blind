@@ -1,5 +1,6 @@
 package com.scrivtech.powerview.ble
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -7,7 +8,9 @@ import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -255,6 +258,23 @@ public class ShadeGattClient(
             g.disconnect()
             g.close()
         }
+    }
+
+    public companion object {
+        /**
+         * Every method on this class is annotated `@SuppressLint("MissingPermission")`
+         * and requires the caller to hold `BLUETOOTH_CONNECT`. This is that check,
+         * living next to the API it guards so each caller does not reinvent it —
+         * the mirror of [ShadeScanner.hasScanPermission].
+         *
+         * `BLUETOOTH_CONNECT` is only a runtime permission from API 31; below
+         * that the legacy install-time `BLUETOOTH` permission in the manifest
+         * covers it.
+         */
+        public fun hasConnectPermission(context: Context): Boolean =
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+                PackageManager.PERMISSION_GRANTED
     }
 
     private suspend fun <T> awaitWithTimeout(deferred: CompletableDeferred<T>, timeoutMillis: Long, default: T): T =

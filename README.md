@@ -39,9 +39,9 @@ JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
 ## Build order
 
 1. ✅ `:protocol` + unit tests against the sniffed test vectors. No hardware needed.
-2. Scanner + a raw debug screen listing MAC / RSSI / decoded state / hex payload — confirms offsets against real shades before any writes. (`ShadeScanner`, `DebugScanScreen` exist; RSSI/raw-hex surfacing in the screen is a small follow-up, noted in `DebugScanScreen.kt`.)
+2. ✅ Scanner + a raw debug screen listing MAC / RSSI / decoded state / hex payload — confirms offsets against real shades before any writes. Confirmed against real hardware: a Duette TDBU (typeId 8) decodes to the right capability from a live advertisement.
 3. Capability mapping and per-shade UI model. (`Capabilities`, `Shade` exist.)
-4. GATT connect + battery/device-info reads (unencrypted, low risk). (`ShadeGattClient.readCharacteristic` exists; opportunistic battery reads and the weekly sweep worker are still TODO.)
+4. ✅ GATT connect + battery reads (unencrypted, low risk). (`BatteryReader` + the debug screen's per-shade Read battery button. Device-info characteristics and the weekly sweep worker are still TODO — the sweep is step 10.)
 5. Keystream import + first real write. (`FrameCipher.deriveKeystreamFromKey`, `KeystreamStore`, `ShadeGattClient.writeCommand` exist; the import UI is TODO.)
 6. Keystream derivation-from-capture flow, tilt, secondary, sequence handling, command queue. (`KeystreamDeriver`, `CommandQueue` exist; the guided capture UI is TODO.)
 7. Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command` exist.)

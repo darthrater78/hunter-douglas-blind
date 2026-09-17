@@ -1,11 +1,8 @@
 package com.scrivtech.powerview.widget
 
-import android.Manifest
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.pm.PackageManager
-import android.os.Build
 import androidx.core.content.ContextCompat
 import com.scrivtech.powerview.ble.ShadeGattClient
 import com.scrivtech.powerview.data.Command
@@ -69,7 +66,7 @@ public class ActionRunner(
         // caller, and it runs from surfaces with no UI to prompt from, so an
         // unchecked SecurityException here would surface as a crash rather than
         // a failed command.
-        if (!hasConnectPermission(context)) return false
+        if (!ShadeGattClient.hasConnectPermission(context)) return false
 
         val metadata = shadeStore.shades.first()[command.macAddress] ?: return false
         val homeId = metadata.homeId ?: return false
@@ -126,16 +123,4 @@ public class ActionRunner(
             .getOrPut(macAddress) { AtomicInteger(Byte.MIN_VALUE.toInt()) }
             .getAndIncrement()
             .toByte()
-
-    public companion object {
-        /**
-         * `BLUETOOTH_CONNECT` is only a runtime permission from API 31; before
-         * that the legacy install-time `BLUETOOTH` permission in the manifest
-         * covers it. Mirrors `ShadeScanner.hasScanPermission`.
-         */
-        public fun hasConnectPermission(context: Context): Boolean =
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
-                PackageManager.PERMISSION_GRANTED
-    }
 }
