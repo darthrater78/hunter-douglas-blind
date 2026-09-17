@@ -26,8 +26,8 @@ coroutines = "1.11.0" # VERIFIED — Maven Central, kotlinx-coroutines-android
 serialization-json = "1.11.0" # VERIFIED — Maven Central, kotlinx-serialization-json (latest stable, excludes 1.12.0-RC)
 
 # AndroidX
-core-ktx = "1.15.0" # UNVERIFIED
-appcompat = "1.7.0" # UNVERIFIED
+core-ktx = "1.19.0" # UNVERIFIED
+appcompat = "1.8.0" # UNVERIFIED
 activity-compose = "1.9.3" # UNVERIFIED
 lifecycle = "2.8.7" # UNVERIFIED
 compose-bom = "2024.12.01" # UNVERIFIED
@@ -35,13 +35,13 @@ datastore = "1.1.1" # UNVERIFIED
 work = "2.10.0" # UNVERIFIED
 glance = "1.1.1" # UNVERIFIED
 security-crypto = "1.1.0" # VERIFIED — CI green on the stable release (PR #5); was 1.1.0-alpha06
-navigation-compose = "2.8.5" # UNVERIFIED
+navigation-compose = "2.10.1" # UNVERIFIED — referenced by no module, so no build has ever resolved it
 
 # Test
 junit5 = "6.1.3" # VERIFIED — CI green (PR #2); test-only, :protocol
 junit4 = "4.13.2" # UNVERIFIED
-androidx-test-ext = "1.2.1" # UNVERIFIED
-espresso = "3.6.1" # UNVERIFIED
+androidx-test-ext = "1.3.0" # UNVERIFIED
+espresso = "3.7.0" # UNVERIFIED
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
