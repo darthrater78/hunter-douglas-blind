@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up JDK
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@ac638b010cf753c3731813f9302c85b32d0b30b0 # v4.4.1
+
+      # :protocol has zero Android dependencies, so its tests are the one
+      # thing this workflow can prove even before the Android SDK/toolchain
+      # versions below have been confirmed (see gradle/libs.versions.toml —
+      # several are UNVERIFIED because Google's Maven repo was unreachable
+      # from the container that wrote this scaffold).
+      - name: Test :protocol (pure JVM, no Android SDK needed)
+        run: ./gradlew :protocol:test
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Run unit tests
+        run: ./gradlew test
+
+      # ADAPT: add lint check once the app has enough surface area for it to be worth gating on
+      # - name: Lint
+      #   run: ./gradlew lint

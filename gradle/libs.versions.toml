@@ -1,0 +1,81 @@
+# Dependency version catalog.
+#
+# Versions marked VERIFIED were looked up against Maven Central from this
+# session (see chat for the lookup). Versions marked UNVERIFIED could not be
+# checked: this container's network policy blocks dl.google.com /
+# maven.google.com, which is the only place AndroidX and AGP metadata is
+# published. Confirm each UNVERIFIED line against
+# https://developer.android.com/build/releases/gradle-plugin and
+# https://developer.android.com/jetpack/androidx/versions before the first
+# real build, then delete this notice.
+
+[versions]
+# Build tooling
+agp = "8.7.3" # UNVERIFIED — confirm latest AGP compatible with Gradle 8.14
+kotlin = "2.4.20" # VERIFIED — Maven Central, org.jetbrains.kotlin:kotlin-gradle-plugin
+compileSdk = "35" # UNVERIFIED — confirm latest stable Android API level
+targetSdk = "35" # UNVERIFIED
+minSdk = "26" # Android 8.0 — chosen baseline, not a lookup; raise/lower as needed
+
+# Kotlin ecosystem
+coroutines = "1.11.0" # VERIFIED — Maven Central, kotlinx-coroutines-android
+serialization-json = "1.11.0" # VERIFIED — Maven Central, kotlinx-serialization-json (latest stable, excludes 1.12.0-RC)
+
+# AndroidX
+core-ktx = "1.15.0" # UNVERIFIED
+appcompat = "1.7.0" # UNVERIFIED
+activity-compose = "1.9.3" # UNVERIFIED
+lifecycle = "2.8.7" # UNVERIFIED
+compose-bom = "2024.12.01" # UNVERIFIED
+datastore = "1.1.1" # UNVERIFIED
+work = "2.10.0" # UNVERIFIED
+glance = "1.1.1" # UNVERIFIED
+security-crypto = "1.1.0-alpha06" # UNVERIFIED — only pre-release exists upstream as of last training data
+navigation-compose = "2.8.5" # UNVERIFIED
+
+# Test
+junit5 = "5.11.4" # UNVERIFIED
+junit4 = "4.13.2" # UNVERIFIED
+androidx-test-ext = "1.2.1" # UNVERIFIED
+espresso = "3.6.1" # UNVERIFIED
+
+[libraries]
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization-json" }
+
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "core-ktx" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activity-compose" }
+androidx-lifecycle-runtime-ktx = { module = "androidx.lifecycle:lifecycle-runtime-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { module = "androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "lifecycle" }
+androidx-lifecycle-service = { module = "androidx.lifecycle:lifecycle-service", version.ref = "lifecycle" }
+
+androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "compose-bom" }
+androidx-compose-ui = { module = "androidx.compose.ui:ui" }
+androidx-compose-ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
+androidx-compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling" }
+androidx-compose-ui-tooling-preview = { module = "androidx.compose.ui:ui-tooling-preview" }
+androidx-compose-material3 = { module = "androidx.compose.material3:material3" }
+
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "work" }
+androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "security-crypto" }
+androidx-navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
+
+androidx-glance-appwidget = { module = "androidx.glance:glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { module = "androidx.glance:glance-material3", version.ref = "glance" }
+
+# Test
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
+junit4 = { module = "junit:junit", version.ref = "junit4" }
+androidx-test-ext-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-test-ext" }
+androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "espresso" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

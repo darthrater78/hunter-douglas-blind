@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # GitHub Actions — keeps SHA pins and their version comments current.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # Gradle — covers build.gradle.kts / settings.gradle.kts / gradle/libs.versions.toml
+  # across every module. Several versions in libs.versions.toml are marked
+  # UNVERIFIED (see that file's header) because Google's Maven repo was
+  # unreachable from the container that scaffolded this project — Dependabot
+  # running in CI, with normal network access, is what actually keeps these
+  # current going forward.
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"

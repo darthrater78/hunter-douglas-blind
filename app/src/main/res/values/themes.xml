@@ -1,0 +1,4 @@
+<resources>
+    <!-- Material3 DayNight base theme. Swap for a custom brand theme once one exists. -->
+    <style name="Theme.PowerView" parent="android:Theme.Material.DayNight.NoActionBar" />
+</resources>

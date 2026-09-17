@@ -1,0 +1,125 @@
+# PowerView Gen 3 — Direct BLE Control (Android)
+
+An Android app that reads shade state and commands shade position for
+Hunter Douglas PowerView **Generation 3** shades over BLE, with **no
+Gateway and no Hunter Douglas account**.
+
+Protocol details are derived from reading the openHAB binding
+`org.openhab.binding.bluetooth.hdpowerview` (EPL-2.0) — see
+[`docs/PROTOCOL.md`](docs/PROTOCOL.md) for the full reference and
+`:protocol`'s KDoc for the implementation detail. That binding's code isn't
+copied here (different license); the protocol was reimplemented from
+understanding it.
+
+## Status
+
+Starting framework. `:protocol` (advertisement parsing, command frame
+encoding, AES-CTR keystream handling, capability lookup) is fully
+implemented and unit-tested against real sniffed test vectors — see
+[Verifying `:protocol`](#verifying-protocol) below. Everything past that
+follows the build order below; see each module's TODOs for exactly what's
+next.
+
+## Module map
+
+```
+:protocol   pure Kotlin/JVM, zero Android deps — frame math, unit tested here and now
+:ble        Android — scanning, GATT client, per-connection command serialization
+:data       Android — repository, persisted metadata + encrypted keystream storage, saved actions
+:ui         Android/Compose — shade list UI (currently: the build-order-step-2 debug screen)
+:widget     Android — the single command-execution funnel (ActionRunner/CommandWorker);
+            Glance widgets/tile/config activity are TODO stubs, deferred per the build order
+:app        Android application — manifest/permissions, MainActivity, DI wiring
+```
+
+`:protocol` has no Android dependency on purpose: it's unit-testable on any
+JVM today, and portable later to a Python/`bleak` bridge for Home Assistant
+(build order step 12) without a rewrite.
+
+## Build order
+
+1. ✅ `:protocol` + unit tests against the sniffed test vectors. No hardware needed.
+2. Scanner + a raw debug screen listing MAC / RSSI / decoded state / hex payload — confirms offsets against real shades before any writes. (`ShadeScanner`, `DebugScanScreen` exist; RSSI/raw-hex surfacing in the screen is a small follow-up, noted in `DebugScanScreen.kt`.)
+3. Capability mapping and per-shade UI model. (`Capabilities`, `Shade` exist.)
+4. GATT connect + battery/device-info reads (unencrypted, low risk). (`ShadeGattClient.readCharacteristic` exists; opportunistic battery reads and the weekly sweep worker are still TODO.)
+5. Keystream import + first real write. (`FrameCipher.deriveKeystreamFromKey`, `KeystreamStore`, `ShadeGattClient.writeCommand` exist; the import UI is TODO.)
+6. Keystream derivation-from-capture flow, tilt, secondary, sequence handling, command queue. (`KeystreamDeriver`, `CommandQueue` exist; the guided capture UI is TODO.)
+7. Persistence, labels/rooms, the `ShadeAction` model. (`ShadeStore`, `ActionStore`, `ShadeAction`/`Command` exist.)
+8. `ActionRunner` + `CommandWorker`, driven from in-app buttons first. (Both exist; in-app buttons to drive them are TODO.)
+9. Glance widgets: 1×1, then the grid, then the config activity, with pending/failed states. (Stubbed with TODOs in `:widget` — deferred because this container has no Android SDK to compile/verify Glance code against.)
+10. Battery sweep worker and low-battery notifications.
+11. Quick Settings tile and shortcuts. (Stubbed with a TODO in `:widget`.)
+12. Optional: Home Assistant bridge via a Python port of `:protocol` + `bleak` + an ESPHome BLE proxy.
+
+## Verifying `:protocol`
+
+The frame layout in `CommandFrameBuilder` was derived empirically: XOR-decoding
+the five sniffed ciphertext vectors from the spec against each other (using
+the shared AES-CTR keystream) turned up a one-byte discrepancy against an
+inline hex-template annotation in the original spec text — the field-offset
+table elsewhere in that same spec, and this empirical decode, agree with each
+other and with what's implemented. `FrameCipherTest` re-encrypts all five
+vectors with the real AES-128 key and asserts an exact ciphertext match, so
+this isn't just "compiles" — it's checked against real sniffed traffic.
+
+```
+./gradlew :protocol:test
+```
+
+39 tests pass as of this scaffold (`AdvertisementParserTest`,
+`CapabilitiesTest`, `CommandFrameBuilderTest`, `FrameCipherTest`,
+`KeystreamDeriverTest`).
+
+The rest of the modules need an Android SDK to build (none is installed in
+the container that wrote this scaffold — `:protocol` was verified standalone
+instead). CI (`.github/workflows/ci.yml`) builds the whole project on a
+GitHub-hosted runner, which has the SDK preinstalled.
+
+## Versions that need confirming before the first full build
+
+`gradle/libs.versions.toml` marks each dependency `VERIFIED` (checked
+against Maven Central in-session) or `UNVERIFIED`. The AGP and every
+AndroidX version are `UNVERIFIED` because this container's network policy
+blocks `dl.google.com`/`maven.google.com` — the only place that metadata is
+published — so those numbers are reasonable-but-unconfirmed placeholders,
+not looked-up facts. Confirm against
+[the AGP release notes](https://developer.android.com/build/releases/gradle-plugin)
+and [AndroidX release notes](https://developer.android.com/jetpack/androidx/versions)
+before relying on a full build, then remove the `UNVERIFIED` markers.
+Kotlin, kotlinx-coroutines and kotlinx-serialization-json are `VERIFIED`
+(Maven Central, reachable from this container).
+
+`androidx.security:security-crypto` (used by `KeystreamStore`, the encrypted
+keystream storage) has historically only shipped pre-1.0 / alpha releases
+upstream — confirm its current status before shipping; if it's still alpha,
+that's worth a deliberate call given what it's protecting (see
+`docs/PROTOCOL.md` §4 on what a keystream lets you do).
+
+## Known protocol unknowns
+
+See `docs/PROTOCOL.md` §8 — purpose of the second GATT characteristic,
+whether writes want a response, sequence-byte validation, the `velocity`
+field, and a few others. All need real hardware to resolve.
+
+## CI/CD
+
+- `.github/workflows/ci.yml` — builds `:protocol` tests standalone (no SDK
+  dependency), then `assembleDebug` + `test` across every module, on every
+  push/PR to the default branch.
+- `.github/workflows/release.yml` — on a `v*` tag: verifies the tag is on
+  the default branch and CI passed for that commit, builds an APK, and
+  attaches it to a GitHub release. **Produces an unsigned APK as scaffolded**
+  — add a signing config (commented-out steps in the workflow show the
+  keystore-secret pattern) before shipping a real release.
+- `.github/dependabot.yml` — weekly PRs for GitHub Actions and Gradle
+  dependencies.
+
+## Security notes
+
+- The write keystream (spec §1.4/§4) is stored via `EncryptedSharedPreferences`
+  (Android Keystore-backed), separate from the plain shade metadata blob —
+  see `KeystreamStore` vs `ShadeStore`.
+- BLE permissions are scoped to `neverForLocation` since the app filters on
+  manufacturer data, not beacons.
+- No network calls exist anywhere in this app (by design — no Gateway, no
+  account) — nothing here talks to the internet at all.

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  API 31+ backup/transfer rules. shade_keystreams (KeystreamStore) is the one
+  piece of app data that functions as a credential — anyone with a home's
+  keystream can command every shade in it (see docs/PROTOCOL.md §4) — so it's
+  excluded from both cloud backup and device-to-device transfer even though
+  the file's contents are themselves encrypted at rest via the Android
+  Keystore (whose key does not travel with a backup/transfer anyway; this
+  exclusion is defense in depth, not the only protection).
+  Plain shade metadata and saved actions are left in, since restoring them is
+  a real UX win (labels/rooms/widget layout survive a device change) and they
+  carry no secret.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="shade_keystreams.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="shade_keystreams.xml" />
+    </device-transfer>
+</data-extraction-rules>

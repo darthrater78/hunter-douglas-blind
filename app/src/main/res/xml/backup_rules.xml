@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-API-31 equivalent of data_extraction_rules.xml — see that file's comment. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="shade_keystreams.xml" />
+</full-backup-content>
