@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
     // Glance widgets are Compose: their composables need the Compose compiler
     // plugin exactly as :ui's do, even though nothing here draws a Compose UI
     // on screen in the usual sense.

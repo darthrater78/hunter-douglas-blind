@@ -4,7 +4,14 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
-    alias(libs.plugins.kotlin.android) apply false
+    // Load-bearing beyond :protocol. AGP 9 compiles the Android modules with
+    // built-in Kotlin, and AGP 9.4.0 itself only depends on Kotlin 2.2.10. This
+    // line puts kotlin-gradle-plugin 2.4.20 on the shared build classpath, so
+    // built-in Kotlin compiles with 2.4.20, matching the Compose compiler plugin
+    // pinned to the same catalog `kotlin` version. Without it the build does not
+    // configure at all: AGP has already put a Kotlin plugin on the classpath, and
+    // :protocol's kotlin.jvm request fails with "already on the classpath with an
+    // unknown version".
     alias(libs.plugins.kotlin.jvm) apply false
 }
 
