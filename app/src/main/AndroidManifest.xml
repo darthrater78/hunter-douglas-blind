@@ -37,6 +37,29 @@
         android:label="@string/app_name"
         android:theme="@style/Theme.PowerView">
 
+        <!--
+          PowerViewApplication implements Configuration.Provider, i.e. on-demand
+          WorkManager initialization. WorkManager's automatic startup initializer
+          must therefore not run: if it does, WorkManager comes up with its
+          default configuration before ours is ever read, CommandWorker.Factory
+          is never registered, and every widget/tile command fails at worker
+          instantiation. `lintVitalRelease` treats this as a fatal error, which
+          is how it surfaced.
+
+          Only WorkManager's initializer is removed, not the whole provider, so
+          androidx.startup keeps working for the other libraries that use it.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

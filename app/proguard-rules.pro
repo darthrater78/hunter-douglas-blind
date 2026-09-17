@@ -26,3 +26,13 @@
 # (workerClassName != CommandWorker::class.java.name), so obfuscating it
 # silently stops every widget/tile command from running.
 -keep class com.scrivtech.powerview.widget.CommandWorker { *; }
+
+# --- Tink (via androidx.security-crypto) -----------------------------------
+# EncryptedSharedPreferences pulls in Google Tink, which is compiled against
+# compile-only annotations -- ErrorProne's and JSR-305's -- that are absent from
+# the runtime classpath by design. R8 sees the dangling references, reports them
+# as missing classes and fails the build. Nothing dereferences an annotation at
+# runtime, so warning about them is the only thing to suppress here; this is not
+# a `-keep` and it does not weaken shrinking.
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.annotation.**
