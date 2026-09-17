@@ -30,11 +30,25 @@ below had to leave open, and corrected one it got wrong.
   stable release with no Dependabot PR offering them: activity-compose
   1.9.3 → 1.13.0, lifecycle 2.8.7 → 2.11.0, datastore 1.1.1 → 1.2.1, work
   2.10.0 → 2.11.2, glance 1.1.1 → 1.2.0. The catalog's `UNVERIFIED` markers are
-  replaced with `current` or `BEHIND`, as checked on 2026-09-17. Those five are
-  not bumped here; that is its own change with its own build.
-- **Found, not fixed:** the full `./gradlew lint` fails on `MissingPermission`
-  in `:ble`'s `ShadeScanner`, and did before this change. CI has never run that
-  task (it is commented out in `ci.yml`); `lintVitalRelease` passes.
+  replaced with `current`, as checked on 2026-09-17, and all five are bumped in
+  their own commit. They compile with no source changes; the widgets (Glance)
+  and the command funnel (WorkManager) are what to look at on a device.
+- **Scanning never worked on Android 8–11, and is fixed.** Found by running
+  the full `./gradlew lint`, which had never passed and which CI did not run.
+  `ShadeScanner.hasScanPermission` checked `BLUETOOTH_SCAN`, which only exists
+  from API 31, so on API 26–30 it always read as denied. Below 31 a scan also
+  needs `ACCESS_FINE_LOCATION` at runtime, and the app never requested it.
+  `ShadeScanner.scanPermission()` now names the right permission per API level
+  and `MainActivity` requests location below 31. Not yet tried on an Android
+  8–11 device.
+- **Full lint passes, and CI now runs it.** Besides the scanner, the one other
+  error was `QuickSettingsTile` calling the deprecated
+  `startActivityAndCollapse(Intent)`, already only below API 34; lint flags it
+  regardless of the version branch, so it is suppressed with a comment.
+- **`gradle/actions/setup-gradle` v6.3.0 is offered (PR #9), and needs a
+  decision alongside it.** From v5 the action defaults to a proprietary,
+  closed-source caching provider ("Enhanced Caching") with its own terms of
+  use. `cache-provider: basic` keeps the open-source cache v4 used.
 - `SKILLS-RECOMMENDATION.md`, a scratch file of findings for another
   repository, is deleted as its own commit message said it would be.
 

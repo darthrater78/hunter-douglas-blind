@@ -4,8 +4,8 @@ Version: n/a — still pre-release, nothing tagged
 Updated: 2026-09-17 (session 4)
 
 🔢 VERSION    ➖ N/A on a work commit — no version bump, nothing tagged or published
-🔨 BUILD      ✅ green locally (CI's exact tasks, 141 tests) on the build server; CI green at the prior head
-🔒 SECURITY   ✅ session-4 diff is build config and docs, 0 Critical / 0 High; Dependabot alerts now on
+🔨 BUILD      ✅ green locally (CI's exact tasks incl. full lint, 141 tests) on the build server
+🔒 SECURITY   ✅ session-4 diffs reviewed, 0 Critical / 0 High; Dependabot alerts now on; see PR #9 caching note
 📄 DOCS       ✅ CHANGELOG, README, docs/HANDOFF.md and this file updated for session 4
 📦 RELEASE    ⬜ nothing open; the Dependabot queue is cleared (6 merged, 1 closed)
 🚀 SHIP       ⬜ nothing tagged or released
@@ -38,9 +38,10 @@ fix.
 `./gradlew :protocol:test assembleDebug test assembleRelease` (exactly CI's
 tasks) passes: 141 test cases, 0 failed, and R8 plus `lintVitalRelease` on the
 release build. It passed before the session's changes and again after the
-built-in Kotlin migration. Full `./gradlew lint` fails (2 errors, starting with
-`MissingPermission` at `ShadeScanner.kt:96`) and did before the change too.
-CI does not run it.
+built-in Kotlin migration. Full `./gradlew lint` failed before this session
+(it had never passed); its findings led to a real bug, scanning never working
+on Android 8–11, which is fixed. Lint now passes and CI runs it. The five
+AndroidX bumps were built and linted the same way.
 
 **Green at the branch head**, including `assembleRelease` with R8, where
 `lintVitalRelease` runs.
@@ -108,6 +109,12 @@ Specifically reviewed:
   `ci.yml` declares `permissions: contents: read` and uses no secrets.
   `release.yml`, which does handle signing secrets, triggers on tags only and
   was not touched. No escalation.
+
+**Session 4 code change, reviewed:** the scan permission fix asks for
+`ACCESS_FINE_LOCATION` on API 26–30 only. It was already declared with
+`maxSdkVersion="30"`, the app uses it for nothing but the scan the OS gates on
+it, and on 31+ `neverForLocation` still applies. No new permission is declared.
+0 Critical / 0 High.
 
 **Update, session 4: Dependabot alerts and security updates are now enabled**
 by the owner. `GET .../dependabot/alerts` returns `[]` (no open alerts) instead
@@ -180,8 +187,10 @@ is something CI can answer:
 1. ~~**Enable Dependabot alerts**~~ Done by the owner before session 4.
 2. ~~**The built-in Kotlin migration**~~ Done in session 4, built locally.
 3. **Look at the app under the Black (OLED) theme** after the Compose BOM jump.
-4. **Five AndroidX lines are behind** with no Dependabot PR for them
-   (activity-compose, lifecycle, datastore, work, glance). See "Currency" in
-   `docs/HANDOFF.md`. Build locally before pushing.
-5. **Full `./gradlew lint` fails** on `MissingPermission` in `:ble`. Fix it
-   before enabling the commented-out lint step in `ci.yml`.
+4. ~~**Five AndroidX lines are behind**~~ Bumped in session 4, built locally.
+5. ~~**Full `./gradlew lint` fails**~~ Fixed in session 4; CI now runs lint.
+6. **Merge PR #9** (setup-gradle v6.3.0; SHA verified, CI green), then set
+   `cache-provider: basic` on both setup-gradle steps unless the proprietary
+   enhanced cache is wanted. See "PR #9" in `docs/HANDOFF.md`.
+7. **Try scanning on an Android 8–11 device.** The permission fix is
+   compiled and linted, not run.

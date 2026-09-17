@@ -89,23 +89,20 @@ with the SDK and a `local.properties` pointing at it (`sdk.dir=...`, ignored by
 git) builds the whole project with the same tasks CI runs:
 
 ```
-./gradlew :protocol:test assembleDebug test assembleRelease
+./gradlew :protocol:test assembleDebug test assembleRelease lint
 ```
 
 CI (`.github/workflows/ci.yml`) runs exactly those on a GitHub-hosted runner.
-The full `./gradlew lint` is not among them and currently fails on
-`MissingPermission` in `:ble`; `assembleRelease` runs `lintVitalRelease`, which
-passes.
 
 ## Dependency currency
 
-`gradle/libs.versions.toml` marks each AndroidX and AGP line `current` or
-`BEHIND` (naming the newer stable release), as checked against Google Maven on
-2026-09-17. Those lines used to say `UNVERIFIED`, because the container that
-scaffolded this project could not reach Google Maven at all.
+`gradle/libs.versions.toml` marks each AndroidX and AGP line `current`, as
+checked against Google Maven on 2026-09-17. Those lines used to say
+`UNVERIFIED`, because the container that scaffolded this project could not
+reach Google Maven at all.
 
-Five were behind on that date without Dependabot having offered them, so an
-empty Dependabot queue is not proof of currency. `targetSdk` 35 is deliberately
+Five were behind on that date without Dependabot having offered them (since
+bumped), so an empty Dependabot queue is not proof of currency. `targetSdk` 35 is deliberately
 left below `compileSdk` 37 and may be at or below the Play Store's floor; that
 is a release decision, not a dependency bump.
 

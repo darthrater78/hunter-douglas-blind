@@ -16,8 +16,8 @@ updates:
   # alerts and security updates settings, both enabled as of 2026-09-17.
   #
   # An empty queue is not proof of currency. On 2026-09-17, with nothing open,
-  # five AndroidX lines were still behind their latest stable release; see the
-  # BEHIND markers in libs.versions.toml.
+  # five AndroidX lines were still behind their latest stable release (since
+  # bumped by hand). Check Google Maven directly now and then.
   - package-ecosystem: "gradle"
     directory: "/"
     schedule:

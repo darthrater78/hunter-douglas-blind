@@ -35,14 +35,16 @@ out loud rather than failing opaquely — see "The no-keystream state" below.
 
 **One thing is waiting: step 5.** The Dependabot queue that used to sit in
 front of it is done, and the fourth session closed two of its follow-ups: the
-built-in Kotlin migration is taken, and Dependabot alerts are on. Still open,
-none blocking step 5: a visual check of the Compose BOM jump against the OLED
-theme, five AndroidX lines that are behind (see "Currency" below), and a full
-`lint` that has never passed. All are under "The dependency sweep".
+built-in Kotlin migration is taken, Dependabot alerts are on, five AndroidX
+lines that were behind are bumped, and full `lint` passes and gates CI, which
+exposed and fixed a scanning bug on Android 8–11. Still open, none blocking
+step 5: a visual check of the Compose BOM jump against the OLED theme, a device
+check of the widgets on the newer Glance/WorkManager, and PR #9's caching
+choice. All are under "The dependency sweep".
 
 **The project now builds locally.** The fourth session ran on a server with an
 Android SDK and ordinary network access, where
-`./gradlew :protocol:test assembleDebug test assembleRelease` passes. That makes
+`./gradlew :protocol:test assembleDebug test assembleRelease lint` passes. That makes
 a lot of "Verifying work without an Android SDK" below a fallback for the
 sandboxed container rather than the only option.
 
@@ -352,10 +354,25 @@ behind with no Dependabot PR offering them:
 | `work` | 2.10.0 | 2.11.2 |
 | `glance` | 1.1.1 | 1.2.0 |
 
-Why Dependabot skipped them is not established. The catalog now marks every
-AndroidX/AGP line `current` or `BEHIND` instead of `UNVERIFIED`. Bumping these
-is a separate change; glance and work are the ones most worth building and
-looking at, because the widgets and the command funnel sit on them.
+Why Dependabot skipped them is not established. **All five are now bumped**
+(its own commit), compiling with no source changes, and the catalog marks every
+AndroidX/AGP line `current` instead of `UNVERIFIED`. Glance and WorkManager
+carry the widgets, the tile and the command funnel, so those are what to look
+at on a device.
+
+### PR #9: setup-gradle v6.3.0, and a caching choice
+
+Dependabot offered `gradle/actions/setup-gradle` 4.4.3 → 6.3.0 after the
+fourth session's push. The SHA resolves to the upstream v6.3.0 tag and CI is
+green on it. Merging it was left to the owner.
+
+It changes more than a version: from v5 the action defaults to
+`cache-provider: enhanced`, a **proprietary, closed-source** caching provider
+with its own terms of use (the CI log says so on every run, and points at
+`gradle/actions` `DISTRIBUTION.md`). v4 used the open-source cache. For a
+repository that resolves every action SHA by hand, the consistent choice is
+`cache-provider: basic` on both `setup-gradle` steps, in `ci.yml` and
+`release.yml`, as a follow-up commit after the merge.
 
 ### The three things the plan got wrong
 
@@ -651,12 +668,16 @@ where `lintVitalRelease` runs. Every commit on this branch has been seen by a
 compiler. The fourth session's built-in Kotlin migration was built locally
 with CI's exact tasks before being pushed.
 
-**The full `./gradlew lint` fails, and always has.** CI does not run it (it is
-commented out in `ci.yml`), so nothing noticed: 2 errors and 1 warning,
-starting with `MissingPermission` at `ShadeScanner.kt:96`
-(`scanner.stopScan(callback)`). The fourth session confirmed it fails
-identically before its own changes. Worth fixing before turning that CI step
-on.
+**Full `./gradlew lint` passes now, and CI runs it.** It had never passed and
+CI had it commented out, while `lintVitalRelease` stayed green, so nothing
+noticed. Its `MissingPermission` and `InlinedApi` findings in `ShadeScanner`
+led to a real bug: `hasScanPermission` checked `BLUETOOTH_SCAN`, which does not
+exist below API 31, and the app never requested `ACCESS_FINE_LOCATION`, which a
+scan needs there. **Scanning could never have worked on Android 8–11.** Fixed
+with `ShadeScanner.scanPermission()` and a location request in `MainActivity`
+below 31, but it has not been tried on such a device. Lint's warnings (not
+errors) are still there: `OldTargetApi` on targetSdk 35, some `UseKtx` and
+`UnusedAttribute`.
 
 The third session's runs went #33–#37 ✅ (the Dependabot merges, most of them
 cancelled by the next merge landing — see below), **#38 ❌ AGP 9**, #39 ✅ the
@@ -697,9 +718,10 @@ These were identified in the audit and cannot be completed from the sandbox:
   No longer blocked: the build server can resolve the tree. Not yet done.
 - **Currency of the pinned versions: mostly answered, and not by the queue.**
   The Dependabot queue being empty was read as "everything is current", and it
-  was not. See "Currency" above: five AndroidX lines are behind. AGP, the
-  wrapper, the action pins and the rest of the catalog are current as of
-  2026-09-17, checked against Google Maven rather than inferred.
+  was not. See "Currency" above: five AndroidX lines were behind and are now
+  bumped. As of 2026-09-17 the whole catalog, AGP and the wrapper are current,
+  checked against Google Maven rather than inferred; setup-gradle waits on PR
+  #9.
 - **`androidx.security:security-crypto` is on the stable `1.1.0`** as of PR #5.
   That closes the alpha concern, which was pressing because step 5 is about to
   put a real keystream behind it. It does **not** settle the larger question:
