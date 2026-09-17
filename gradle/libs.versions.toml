@@ -30,7 +30,7 @@ compose-bom = "2024.12.01" # UNVERIFIED
 datastore = "1.1.1" # UNVERIFIED
 work = "2.10.0" # UNVERIFIED
 glance = "1.1.1" # UNVERIFIED
-security-crypto = "1.1.0-alpha06" # UNVERIFIED — only pre-release exists upstream as of last training data
+security-crypto = "1.1.0" # UNVERIFIED — only pre-release exists upstream as of last training data
 navigation-compose = "2.8.5" # UNVERIFIED
 
 # Test
