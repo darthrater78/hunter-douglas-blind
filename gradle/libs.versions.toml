@@ -4,11 +4,11 @@
 # 2026-09-17, from a machine that can reach it (the container that scaffolded
 # this project could not, which is why these used to be marked UNVERIFIED), and
 # the whole project builds locally on them. "current" means latest stable as of
-# that date; "BEHIND" names the newer stable release that exists.
+# that date.
 #
-# Five lines are BEHIND and Dependabot had not offered any of them, so "no open
-# Dependabot PR" is not evidence of currency here. Bumping them is a separate
-# change with its own build.
+# Five of them (activity-compose, lifecycle, datastore, work, glance) were
+# behind that day with no Dependabot PR offering them, so "no open Dependabot
+# PR" is not evidence of currency here. Check Google Maven directly.
 
 [versions]
 # Build tooling
@@ -27,12 +27,12 @@ serialization-json = "1.11.0" # VERIFIED — Maven Central, kotlinx-serializatio
 # AndroidX
 core-ktx = "1.19.0" # current
 appcompat = "1.8.0" # current
-activity-compose = "1.9.3" # BEHIND — 1.13.0
-lifecycle = "2.8.7" # BEHIND — 2.11.0
+activity-compose = "1.13.0" # current
+lifecycle = "2.11.0" # current
 compose-bom = "2026.09.00" # current
-datastore = "1.1.1" # BEHIND — 1.2.1
-work = "2.10.0" # BEHIND — 2.11.2
-glance = "1.1.1" # BEHIND — 1.2.0
+datastore = "1.2.1" # current
+work = "2.11.2" # current
+glance = "1.2.0" # current
 security-crypto = "1.1.0" # current; was 1.1.0-alpha06 until PR #5
 navigation-compose = "2.10.1" # current — but referenced by no module, so no build has ever resolved it
 
