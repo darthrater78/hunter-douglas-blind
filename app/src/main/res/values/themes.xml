@@ -1,4 +1,15 @@
 <resources>
-    <!-- Material3 DayNight base theme. Swap for a custom brand theme once one exists. -->
-    <style name="Theme.PowerView" parent="android:Theme.Material.DayNight.NoActionBar" />
+    <!--
+      DayNight base theme. The parent is AppCompat's, not the framework's:
+      android:Theme.Material has no DayNight variant at all (only Light and the
+      implicitly-dark base), so android:Theme.Material.DayNight.NoActionBar does
+      not exist and resource linking fails outright on it.
+      androidx.appcompat — already a dependency of :app — supplies a real
+      DayNight theme all the way down to this project's minSdk of 26.
+
+      This theme only dresses the window (background, status/navigation bar)
+      before Compose takes over; the actual UI styling comes from MaterialTheme
+      in MainActivity. Swap for a custom brand theme once one exists.
+    -->
+    <style name="Theme.PowerView" parent="Theme.AppCompat.DayNight.NoActionBar" />
 </resources>

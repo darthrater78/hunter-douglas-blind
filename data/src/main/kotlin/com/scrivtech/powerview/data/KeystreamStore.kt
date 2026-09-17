@@ -3,6 +3,7 @@ package com.scrivtech.powerview.data
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import java.util.Locale
 
 /**
  * Persists the per-`homeId` write keystream (spec §1.4, §2.4). This is the
@@ -29,6 +30,11 @@ public class KeystreamStore(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
+    /**
+     * @throws IllegalStateException if the stored value is not well-formed hex.
+     * Callers on a background surface should treat that the same as "no
+     * keystream" rather than letting it escape — see `ActionRunner.runCommand`.
+     */
     public fun get(homeId: Int): ByteArray? = prefs.getString(keyFor(homeId), null)?.let(::hexToBytes)
 
     public fun put(homeId: Int, keystream: ByteArray) {
@@ -43,8 +49,23 @@ public class KeystreamStore(context: Context) {
 
     private fun keyFor(homeId: Int) = "home_$homeId"
 
-    private fun bytesToHex(bytes: ByteArray): String = bytes.joinToString("") { "%02x".format(it) }
+    // Locale.ROOT so the digits are always ASCII. java.util.Formatter does not
+    // localize %x today, but nothing in the contract promises that, and this
+    // string is a round-tripped credential rather than display text.
+    private fun bytesToHex(bytes: ByteArray): String =
+        bytes.joinToString("") { String.format(Locale.ROOT, "%02x", it) }
 
-    private fun hexToBytes(hex: String): ByteArray =
-        ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
+    /**
+     * Unvalidated input used to reach here: an odd-length value silently
+     * truncated the last nibble, and a non-hex character threw
+     * NumberFormatException from deep inside a `let`. Both are now one explicit
+     * failure at the boundary.
+     */
+    private fun hexToBytes(hex: String): ByteArray {
+        check(hex.length % 2 == 0) { "stored keystream has an odd number of hex digits (${hex.length})" }
+        check(hex.all { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }) {
+            "stored keystream is not valid hex"
+        }
+        return ByteArray(hex.length / 2) { i -> hex.substring(i * 2, i * 2 + 2).toInt(16).toByte() }
+    }
 }

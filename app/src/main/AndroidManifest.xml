@@ -15,14 +15,19 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" />
 
-    <!-- TODO(build order step 9): required once background command execution
-         (CommandWorker triggered from a widget/tile while the app is
-         backgrounded) starts a foreground service, per spec §3.3. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Low-battery notifications from the weekly battery sweep (build order
+         step 10, spec §2.5). Declared now because BatterySweepWorker actually
+         posts them; BatteryNotifier checks the grant at runtime and stays
+         silent without it, since a background worker has nowhere to prompt. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" tools:targetApi="tiramisu" />
 
-    <!-- TODO(build order step 10): battery sweep low-battery notifications, spec §2.5. -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Deliberately NOT declared yet, because nothing requests or uses them:
+         - FOREGROUND_SERVICE / FOREGROUND_SERVICE_CONNECTED_DEVICE
+           (build order step 9, spec §3.3) — add together with the <service>
+           element itself. FOREGROUND_SERVICE_CONNECTED_DEVICE without a
+           matching declared service is also a Play review failure.
+         Declaring a permission before the feature that needs it costs the user
+         a scarier install prompt and buys nothing. -->
 
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
@@ -35,6 +40,29 @@
         android:icon="@android:drawable/sym_def_app_icon"
         android:label="@string/app_name"
         android:theme="@style/Theme.PowerView">
+
+        <!--
+          PowerViewApplication implements Configuration.Provider, i.e. on-demand
+          WorkManager initialization. WorkManager's automatic startup initializer
+          must therefore not run: if it does, WorkManager comes up with its
+          default configuration before ours is ever read, CommandWorker.Factory
+          is never registered, and every widget/tile command fails at worker
+          instantiation. `lintVitalRelease` treats this as a fatal error, which
+          is how it surfaced.
+
+          Only WorkManager's initializer is removed, not the whole provider, so
+          androidx.startup keeps working for the other libraries that use it.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

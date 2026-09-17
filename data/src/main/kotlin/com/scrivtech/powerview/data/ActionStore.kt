@@ -21,30 +21,49 @@ private val Context.actionsDataStore: DataStore<Preferences> by preferencesDataS
 public class ActionStore(private val context: Context) {
 
     private val key = stringPreferencesKey("actions_json")
+    private val quarantineKey = stringPreferencesKey("actions_json_unreadable")
     private val json = Json { ignoreUnknownKeys = true }
 
+    /**
+     * Every saved action. Empty (not an error) until anything has been saved,
+     * and also if the stored blob cannot be parsed — see [edit] for why an
+     * unparseable blob is preserved rather than overwritten.
+     */
     public val actions: Flow<List<ShadeAction>> = context.actionsDataStore.data.map { prefs ->
-        val raw = prefs[key] ?: return@map emptyList()
-        runCatching { json.decodeFromString<List<ShadeAction>>(raw) }.getOrDefault(emptyList())
+        decodeOrNull(prefs[key]) ?: emptyList()
     }
 
     public suspend fun upsert(action: ShadeAction) {
-        context.actionsDataStore.edit { prefs ->
-            val current = currentList(prefs)
-            val next = current.filterNot { it.id == action.id } + action
-            prefs[key] = json.encodeToString(next)
-        }
+        edit { current -> current.filterNot { it.id == action.id } + action }
     }
 
     public suspend fun remove(actionId: String) {
+        edit { current -> current.filterNot { it.id == actionId } }
+    }
+
+    /**
+     * Reads, transforms and writes back the stored list.
+     *
+     * An unparseable blob is moved aside under [quarantineKey] before the store
+     * starts fresh, rather than being silently replaced by the transformed
+     * empty list. Losing the action list also breaks every widget and tile
+     * pointing at those ids, so this is worse than it looks: the user would
+     * have to reconfigure every home-screen surface.
+     */
+    private suspend fun edit(transform: (List<ShadeAction>) -> List<ShadeAction>) {
         context.actionsDataStore.edit { prefs ->
-            val current = currentList(prefs)
-            prefs[key] = json.encodeToString(current.filterNot { it.id == actionId })
+            val raw = prefs[key]
+            val current = decodeOrNull(raw)
+            if (current == null && raw != null) {
+                prefs[quarantineKey] = raw
+            }
+            prefs[key] = json.encodeToString(transform(current ?: emptyList()))
         }
     }
 
-    private fun currentList(prefs: Preferences): List<ShadeAction> {
-        val raw = prefs[key] ?: return emptyList()
-        return runCatching { json.decodeFromString<List<ShadeAction>>(raw) }.getOrDefault(emptyList())
+    /** Null means "present but unreadable"; an empty list means "nothing stored yet". */
+    private fun decodeOrNull(raw: String?): List<ShadeAction>? {
+        if (raw == null) return emptyList()
+        return runCatching { json.decodeFromString<List<ShadeAction>>(raw) }.getOrNull()
     }
 }
