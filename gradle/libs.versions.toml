@@ -15,8 +15,10 @@
 # Build tooling
 agp = "9.4.0" # Dependabot-reported current (PR #4); needs Gradle >= 9.6.0, wrapper is 9.7.1
 kotlin = "2.4.20" # VERIFIED — Maven Central, org.jetbrains.kotlin:kotlin-gradle-plugin
-compileSdk = "35" # UNVERIFIED — confirm latest stable Android API level
-targetSdk = "35" # UNVERIFIED
+compileSdk = "37" # Required by the AndroidX artifacts in PRs #1 and #6; AGP 9.4.0 supports it
+targetSdk = "35" # Deliberately NOT moved with compileSdk — targetSdk opts the app in to new
+# runtime behaviour and needs testing on a device, which nothing here can do yet. The README
+# flags it as likely at or below the Play Store floor; that is a release decision, not a bump.
 minSdk = "26" # Android 8.0 — chosen baseline, not a lookup; raise/lower as needed
 
 # Kotlin ecosystem
