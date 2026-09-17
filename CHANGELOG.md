@@ -55,6 +55,46 @@ All notable changes to this project are documented here.
   about the app rather than news about the shades.
 
 ### Added
+- **The battery sweep interval is a setting.** Daily, every 3 days, weekly,
+  every 2 weeks, monthly, or off, under Settings → Battery checks. The
+  default is weekly, which is exactly what the sweep did before, so an
+  install that never touches this keeps the behaviour it had.
+
+  It was a hardcoded constant, and it should not have been: the right answer
+  depends on the home and the cost of being wrong runs both ways. Reading a
+  battery means connecting to the shade, which spends the power being
+  measured, so sweeping daily across a dozen shades is itself a drain — but a
+  month between sweeps lets a shade sit flat for a fortnight before anything
+  says so. The screen states that trade above the options rather than
+  offering a list of bare intervals, because the counter-intuitive half is
+  that checking more often is not free.
+
+  **Off is a real choice**, for a home that is mostly mains-powered or a user
+  who would rather read batteries by hand — so it comes with **Check now**,
+  which runs one sweep immediately. Without that, Off would mean "never see a
+  reading again", which is not a setting anyone wants.
+
+  A changed interval takes effect now, via
+  `ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE`: someone switching from
+  monthly to daily means "start sweeping daily", not "sweep daily once the
+  month is up". App start still uses `KEEP`, so the period is not restarted
+  on every launch — at a monthly interval that could stop it ever running on
+  a phone that gets opened daily.
+
+  **The battery widget's staleness threshold now follows the setting** — two
+  sweep periods, rather than a fixed fortnight. Pinned at 14 days it would
+  have marked everything permanently stale on a monthly sweep, and stayed
+  silent through a fortnight of failures on a daily one. With the sweep off
+  there is no period to double, so it falls back to a flat 30 days.
+
+### Changed
+- `SettingsStore`'s flows are `distinctUntilChanged`. All three settings share
+  one DataStore, so without it changing the theme re-emitted the sweep
+  interval and rescheduled the sweep — restarting its period every time
+  someone toggled dark mode.
+- The settings screen's two near-identical radio rows became one
+  `SettingOption`, now that there are three lists using it.
+
 - **A battery widget.** Every battery-powered shade on the home screen, worst
   first, with a header saying how many are low or unread. Battery monitoring
   is much of the point of this app; the weekly sweep and the low-battery

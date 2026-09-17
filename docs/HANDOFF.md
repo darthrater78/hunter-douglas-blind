@@ -40,7 +40,7 @@ Build order progress (numbering follows the README):
 | 7 Persistence, labels/rooms, actions | ✅ shade list, rooms, naming, action editor |
 | 8 ActionRunner + CommandWorker | ✅ driven from in-app sliders |
 | 9 Glance widgets | ✅ widget, grid, config activity, per-instance state |
-| 10 Battery sweep + notifications | ✅ weekly sweep, one notification, battery widget |
+| 10 Battery sweep + notifications | ✅ configurable sweep, notification, battery widget |
 | 11 Quick Settings tile + shortcuts | ✅ tile, and four dynamic shortcuts |
 | 12 Home Assistant bridge | ⬜ optional |
 
@@ -325,7 +325,8 @@ Test counts as of this commit: 40 in `:protocol`, 4 in `:data`
 (`ActionResultTest`), 44 in `:ui` (`ShadeFormattingTest` 26, `ActionDraftTest` 9,
 `ThemeSelectionTest` 7, `TileActionDescriptionTest` 2), 20 in `:widget`
 (`WidgetPresentationTest` 17, `TilePresentationTest` 6, `ShortcutActionsTest` 6,
-`BatteryWidgetPresentationTest` 11, `BatteryRowsToShowTest` 6).
+`BatteryWidgetPresentationTest` 11, `BatteryRowsToShowTest` 6,
+`StaleAfterDaysTest` 4).
 
 Also verifiable locally: workflow files with `actionlint`.
 

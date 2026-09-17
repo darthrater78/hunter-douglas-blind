@@ -45,9 +45,24 @@ public class PowerViewApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // Safe on every launch: the schedule is KEEP, so an existing weekly
-        // sweep is left running rather than having its interval restarted.
-        BatterySweepWorker.ensureScheduled(this)
+        // The stored interval drives the schedule. KEEP on the first
+        // application, so an existing schedule is not restarted on every
+        // launch -- at a weekly or monthly period that could stop it ever
+        // running on a phone that gets opened daily -- then
+        // CANCEL_AND_REENQUEUE for each later change, so a user who switches
+        // to Daily starts getting daily sweeps now rather than once the old
+        // period elapses.
+        applicationScope.launch {
+            var scheduled = false
+            settingsStore.sweepInterval.collect { interval ->
+                if (scheduled) {
+                    BatterySweepWorker.reschedule(this@PowerViewApplication, interval)
+                } else {
+                    BatterySweepWorker.ensureScheduled(this@PowerViewApplication, interval)
+                    scheduled = true
+                }
+            }
+        }
 
         // Launcher shortcuts are a copy of each action's label, so they are
         // republished whenever the list changes rather than once here -- a

@@ -3,6 +3,7 @@ package com.scrivtech.powerview.ui
 import com.scrivtech.powerview.data.ActionIcon
 import com.scrivtech.powerview.data.Command
 import com.scrivtech.powerview.data.ShadeAction
+import com.scrivtech.powerview.data.SweepInterval
 import com.scrivtech.powerview.data.ThemeMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -102,5 +103,36 @@ class TileActionDescriptionTest {
     fun `an empty action says it does nothing rather than reading as zero shades`() {
         // It can happen: the editor drops shades with no fields enabled.
         assertEquals("No shades — this action does nothing.", tileActionDescription(actionWith(0)))
+    }
+}
+
+class SweepIntervalFormattingTest {
+
+    @Test
+    fun `every interval has a distinct label and a description`() {
+        val labels = SweepInterval.entries.map(::sweepIntervalLabel)
+        assertEquals(labels.size, labels.toSet().size)
+
+        val descriptions = SweepInterval.entries.map(::sweepIntervalDescription)
+        assertEquals(descriptions.size, descriptions.toSet().size)
+
+        for (interval in SweepInterval.entries) {
+            assertTrue("blank label for $interval", sweepIntervalLabel(interval).isNotBlank())
+            assertTrue("blank description for $interval", sweepIntervalDescription(interval).isNotBlank())
+        }
+    }
+
+    @Test
+    fun `off explains how to get a reading instead of just saying no`() {
+        // Off must not read as "never see a battery level again".
+        assertTrue(sweepIntervalDescription(SweepInterval.OFF).contains("Check now"))
+    }
+
+    @Test
+    fun `the explanation names the cost, not just the benefit`() {
+        // The counter-intuitive half of this setting is that checking more
+        // often is itself a drain; if the screen does not say so, the setting
+        // looks like free safety.
+        assertTrue(SWEEP_INTERVAL_EXPLANATION.contains("power"))
     }
 }

@@ -31,7 +31,9 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
+import com.scrivtech.powerview.data.SettingsStore
 import com.scrivtech.powerview.data.ShadeStore
+import com.scrivtech.powerview.data.SweepInterval
 
 /**
  * A home-screen widget answering one question: does anything need new
@@ -64,6 +66,7 @@ public class BatteryWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val shadeStore = ShadeStore(context)
+        val settingsStore = SettingsStore(context)
 
         // Built here rather than in the composition: the launcher activity
         // lives in :app, which :widget cannot reference, so it is resolved
@@ -76,7 +79,15 @@ public class BatteryWidget : GlanceAppWidget() {
 
         provideContent {
             val shades by shadeStore.shades.collectAsState(initial = emptyMap())
-            val rows = batteryRows(shades.values, System.currentTimeMillis())
+            // The staleness threshold follows the user's sweep interval, so
+            // a monthly sweep does not mark everything stale forever and a
+            // daily one does not stay quiet for a fortnight of failures.
+            val interval by settingsStore.sweepInterval.collectAsState(initial = SweepInterval.DEFAULT)
+            val rows = batteryRows(
+                shades = shades.values,
+                nowEpochMillis = System.currentTimeMillis(),
+                staleAfterDays = staleAfterDays(interval),
+            )
 
             GlanceTheme {
                 Column(

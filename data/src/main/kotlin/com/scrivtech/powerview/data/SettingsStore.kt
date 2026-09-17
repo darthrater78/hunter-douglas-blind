@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
@@ -23,6 +24,7 @@ public class SettingsStore(private val context: Context) {
 
     private val themeModeKey = stringPreferencesKey("theme_mode")
     private val tileActionIdKey = stringPreferencesKey("tile_action_id")
+    private val sweepIntervalKey = stringPreferencesKey("sweep_interval")
 
     /**
      * The chosen [ThemeMode], defaulting to [ThemeMode.SYSTEM].
@@ -36,7 +38,7 @@ public class SettingsStore(private val context: Context) {
         prefs[themeModeKey]?.let { stored ->
             ThemeMode.entries.firstOrNull { it.name == stored }
         } ?: ThemeMode.SYSTEM
-    }
+    }.distinctUntilChanged()
 
     public suspend fun setThemeMode(mode: ThemeMode) {
         context.settingsDataStore.edit { prefs -> prefs[themeModeKey] = mode.name }
@@ -57,11 +59,32 @@ public class SettingsStore(private val context: Context) {
      */
     public val tileActionId: Flow<String?> = context.settingsDataStore.data.map { prefs ->
         prefs[tileActionIdKey]?.takeIf { it.isNotBlank() }
-    }
+    }.distinctUntilChanged()
 
     public suspend fun setTileActionId(actionId: String?) {
         context.settingsDataStore.edit { prefs ->
             if (actionId.isNullOrBlank()) prefs.remove(tileActionIdKey) else prefs[tileActionIdKey] = actionId
         }
+    }
+
+    /**
+     * How often the battery sweep runs, defaulting to
+     * [SweepInterval.DEFAULT] — the weekly period it had before it was
+     * configurable, so an install that never touches this keeps its old
+     * behaviour.
+     *
+     * `distinctUntilChanged` matters more here than for the others: all
+     * three settings share one DataStore, so without it changing the theme
+     * would re-emit this and reschedule the sweep, restarting its period
+     * every time someone toggled dark mode.
+     */
+    public val sweepInterval: Flow<SweepInterval> = context.settingsDataStore.data.map { prefs ->
+        prefs[sweepIntervalKey]?.let { stored ->
+            SweepInterval.entries.firstOrNull { it.name == stored }
+        } ?: SweepInterval.DEFAULT
+    }.distinctUntilChanged()
+
+    public suspend fun setSweepInterval(interval: SweepInterval) {
+        context.settingsDataStore.edit { prefs -> prefs[sweepIntervalKey] = interval.name }
     }
 }

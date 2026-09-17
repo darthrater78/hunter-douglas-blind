@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.scrivtech.powerview.data.ShadeAction
+import com.scrivtech.powerview.data.SweepInterval
 import com.scrivtech.powerview.data.ThemeMode
 
 /**
@@ -40,6 +42,9 @@ public fun SettingsScreen(
     actions: List<ShadeAction>,
     tileActionId: String?,
     onTileActionChange: (String?) -> Unit,
+    sweepInterval: SweepInterval,
+    onSweepIntervalChange: (SweepInterval) -> Unit,
+    onSweepNow: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -55,14 +60,52 @@ public fun SettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.selectableGroup()) {
                     for (mode in ThemeMode.entries) {
-                        ThemeOption(
-                            mode = mode,
+                        SettingOption(
+                            label = themeModeLabel(mode),
+                            description = themeModeDescription(mode),
                             selected = mode == themeMode,
                             onSelect = { onThemeModeChange(mode) },
                         )
                     }
                 }
             }
+        }
+
+        item(key = "battery-header") {
+            Text(
+                "Battery checks",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+
+        item(key = "battery-explanation") {
+            Text(
+                SWEEP_INTERVAL_EXPLANATION,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        item(key = "sweep-options") {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.selectableGroup()) {
+                    for (interval in SweepInterval.entries) {
+                        SettingOption(
+                            label = sweepIntervalLabel(interval),
+                            description = sweepIntervalDescription(interval),
+                            selected = interval == sweepInterval,
+                            onSelect = { onSweepIntervalChange(interval) },
+                        )
+                    }
+                }
+            }
+        }
+
+        item(key = "sweep-now") {
+            // The escape hatch that makes Off a real choice rather than a way
+            // to never see a reading again.
+            Button(onClick = onSweepNow) { Text("Check now") }
         }
 
         item(key = "tile-header") {
@@ -86,14 +129,14 @@ public fun SettingsScreen(
                     Column(modifier = Modifier.selectableGroup()) {
                         // "None" first and always present: turning the tile
                         // off has to be as reachable as turning it on.
-                        TileOption(
+                        SettingOption(
                             label = "None",
                             description = "The tile opens the app instead of running anything.",
                             selected = tileActionId == null,
                             onSelect = { onTileActionChange(null) },
                         )
                         for (action in actions) {
-                            TileOption(
+                            SettingOption(
                                 label = action.label,
                                 description = tileActionDescription(action),
                                 selected = action.id == tileActionId,
@@ -107,8 +150,9 @@ public fun SettingsScreen(
     }
 }
 
+/** One radio row: the shape every setting on this screen uses. */
 @Composable
-private fun TileOption(
+private fun SettingOption(
     label: String,
     description: String,
     selected: Boolean,
@@ -133,31 +177,4 @@ private fun TileOption(
     }
 }
 
-@Composable
-private fun ThemeOption(
-    mode: ThemeMode,
-    selected: Boolean,
-    onSelect: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            // selectable() on the row, with the radio button's own onClick
-            // null: this makes the whole row one accessibility target
-            // announced as a radio button, instead of a tiny circle beside
-            // unrelated text.
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-    ) {
-        RadioButton(selected = selected, onClick = null)
 
-        Column(modifier = Modifier.padding(start = 12.dp)) {
-            Text(themeModeLabel(mode), style = MaterialTheme.typography.bodyLarge)
-            Text(
-                themeModeDescription(mode),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}

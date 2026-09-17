@@ -2,6 +2,7 @@ package com.scrivtech.powerview.widget
 
 import com.scrivtech.powerview.data.BatteryLevel
 import com.scrivtech.powerview.data.ShadeMetadata
+import com.scrivtech.powerview.data.SweepInterval
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -11,6 +12,11 @@ class BatteryWidgetPresentationTest {
 
     private val now = 1_700_000_000_000L
     private val day = 24L * 60 * 60 * 1000
+
+    private val weeklyStale = staleAfterDays(SweepInterval.WEEKLY)
+
+    private fun rowsOf(vararg shades: ShadeMetadata, stale: Long = weeklyStale) =
+        batteryRows(shades.toList(), now, stale)
 
     private fun shade(
         mac: String,
@@ -30,13 +36,13 @@ class BatteryWidgetPresentationTest {
     fun `mains-powered shades are left out entirely`() {
         // They are out of the sweep and out of alerting for the same reason;
         // a row that can never need attention costs a row that can.
-        val rows = batteryRows(listOf(shade("a"), shade("b", mains = true)), now)
+        val rows = rowsOf(shade("a"), shade("b", mains = true))
         assertEquals(listOf("a"), rows.map { it.macAddress })
     }
 
     @Test
     fun `a never-read shade is null, never zero`() {
-        val row = batteryRows(listOf(shade("a", percent = null, readDaysAgo = null)), now).single()
+        val row = rowsOf(shade("a", percent = null, readDaysAgo = null)).single()
 
         assertEquals(null, row.percent)
         assertEquals(BatteryLevel.UNKNOWN, row.level)
@@ -46,40 +52,37 @@ class BatteryWidgetPresentationTest {
 
     @Test
     fun `never-read shades sort above even the flattest known one`() {
-        val rows = batteryRows(
-            listOf(
-                shade("known-low", percent = 3),
-                shade("unread", percent = null, readDaysAgo = null),
-                shade("healthy", percent = 90),
-            ),
-            now,
+        val rows = rowsOf(
+            shade("known-low", percent = 3),
+            shade("unread", percent = null, readDaysAgo = null),
+            shade("healthy", percent = 90),
         )
         assertEquals(listOf("unread", "known-low", "healthy"), rows.map { it.macAddress })
     }
 
     @Test
     fun `equal percentages fall back to label order`() {
-        val rows = batteryRows(
-            listOf(shade("b", label = "Zebra", percent = 50), shade("a", label = "Apple", percent = 50)),
-            now,
+        val rows = rowsOf(
+            shade("b", label = "Zebra", percent = 50),
+            shade("a", label = "Apple", percent = 50),
         )
         assertEquals(listOf("Apple", "Zebra"), rows.map { it.label })
     }
 
     @Test
     fun `a reading is only called stale after two missed sweeps`() {
-        val fresh = batteryRows(listOf(shade("a", readDaysAgo = STALE_READING_DAYS - 1)), now).single()
-        val stale = batteryRows(listOf(shade("a", readDaysAgo = STALE_READING_DAYS)), now).single()
+        val fresh = rowsOf(shade("a", readDaysAgo = weeklyStale - 1)).single()
+        val stale = rowsOf(shade("a", readDaysAgo = weeklyStale)).single()
 
         assertFalse(fresh.stale)
         assertTrue(stale.stale)
         assertEquals("80%", batteryRowStatus(fresh))
-        assertEquals("80% · 14d old", batteryRowStatus(stale))
+        assertEquals("80% · ${weeklyStale}d old", batteryRowStatus(stale))
     }
 
     @Test
     fun `a clock that moved backwards reads as fresh, not as a future reading`() {
-        val row = batteryRows(listOf(shade("a", readDaysAgo = -30)), now).single()
+        val row = rowsOf(shade("a", readDaysAgo = -30)).single()
 
         assertEquals(0L, row.ageDays)
         assertFalse(row.stale)
@@ -87,8 +90,8 @@ class BatteryWidgetPresentationTest {
 
     @Test
     fun `the low threshold is inclusive and matches the notifier's`() {
-        val atThreshold = batteryRows(listOf(shade("a", percent = 20)), now).single()
-        val above = batteryRows(listOf(shade("a", percent = 21)), now).single()
+        val atThreshold = rowsOf(shade("a", percent = 20)).single()
+        val above = rowsOf(shade("a", percent = 21)).single()
 
         assertTrue(atThreshold.low)
         assertEquals(BatteryLevel.LOW, atThreshold.level)
@@ -99,35 +102,32 @@ class BatteryWidgetPresentationTest {
     fun `the summary counts low and unread separately`() {
         // Folding them together would either overstate what is low or stay
         // silent while shades have never been read at all.
-        val rows = batteryRows(
-            listOf(
-                shade("a", percent = 5),
-                shade("b", percent = null, readDaysAgo = null),
-                shade("c", percent = 90),
-            ),
-            now,
+        val rows = rowsOf(
+            shade("a", percent = 5),
+            shade("b", percent = null, readDaysAgo = null),
+            shade("c", percent = 90),
         )
         assertEquals("1 low, 1 not read of 3", batterySummaryLine(rows))
     }
 
     @Test
     fun `an all-healthy summary states the threshold it is judging against`() {
-        val rows = batteryRows(listOf(shade("a", percent = 90), shade("b", percent = 55)), now)
+        val rows = rowsOf(shade("a", percent = 90), shade("b", percent = 55))
         assertEquals("All 2 above 20%", batterySummaryLine(rows))
     }
 
     @Test
     fun `no shades is said plainly rather than as zero of zero`() {
         assertEquals("No battery shades set up", batterySummaryLine(emptyList()))
-        assertEquals(emptyList<BatteryRow>(), batteryRows(emptyList(), now))
+        assertEquals(emptyList<BatteryRow>(), batteryRows(emptyList(), now, weeklyStale))
     }
 
     @Test
     fun `only-low and only-unread summaries read correctly`() {
-        val onlyLow = batteryRows(listOf(shade("a", percent = 5)), now)
+        val onlyLow = rowsOf(shade("a", percent = 5))
         assertEquals("1 low of 1", batterySummaryLine(onlyLow))
 
-        val onlyUnread = batteryRows(listOf(shade("a", percent = null, readDaysAgo = null)), now)
+        val onlyUnread = rowsOf(shade("a", percent = null, readDaysAgo = null))
         assertEquals("1 not read of 1", batterySummaryLine(onlyUnread))
     }
 }
@@ -135,7 +135,14 @@ class BatteryWidgetPresentationTest {
 class BatteryRowsToShowTest {
 
     private fun rows(n: Int) = (1..n).map {
-        BatteryRow(macAddress = "m$it", label = "Shade $it", percent = it, level = com.scrivtech.powerview.data.BatteryLevel.LOW, ageDays = 0)
+        BatteryRow(
+            macAddress = "m$it",
+            label = "Shade $it",
+            percent = it,
+            level = com.scrivtech.powerview.data.BatteryLevel.LOW,
+            ageDays = 0,
+            stale = false,
+        )
     }
 
     @Test
@@ -180,5 +187,40 @@ class BatteryRowsToShowTest {
         val shown = batteryRowsToShow(rows(3), max = 0)
         assertEquals(emptyList<BatteryRow>(), shown.rows)
         assertEquals(3, shown.hidden)
+    }
+}
+
+class StaleAfterDaysTest {
+
+    @Test
+    fun `staleness is two sweep periods, so it tracks the user's setting`() {
+        // A fixed fortnight would mark everything stale forever on a monthly
+        // sweep, and stay silent through a fortnight of failures on a daily
+        // one.
+        assertEquals(2L, staleAfterDays(SweepInterval.DAILY))
+        assertEquals(6L, staleAfterDays(SweepInterval.EVERY_THREE_DAYS))
+        assertEquals(14L, staleAfterDays(SweepInterval.WEEKLY))
+        assertEquals(28L, staleAfterDays(SweepInterval.FORTNIGHTLY))
+        assertEquals(60L, staleAfterDays(SweepInterval.MONTHLY))
+    }
+
+    @Test
+    fun `with the sweep off, staleness is a judgement rather than a multiple`() {
+        // Nothing is maintaining the numbers, so there is no period to double.
+        assertEquals(UNSWEPT_STALE_DAYS, staleAfterDays(SweepInterval.OFF))
+    }
+
+    @Test
+    fun `every interval yields a positive threshold`() {
+        for (interval in SweepInterval.entries) {
+            assertTrue("$interval", staleAfterDays(interval) >= 2)
+        }
+    }
+
+    @Test
+    fun `the weekly default preserves the behaviour that predates the setting`() {
+        assertEquals(SweepInterval.WEEKLY, SweepInterval.DEFAULT)
+        assertEquals(7L, SweepInterval.WEEKLY.days)
+        assertEquals(null, SweepInterval.OFF.days)
     }
 }

@@ -3,6 +3,7 @@ package com.scrivtech.powerview.widget
 import com.scrivtech.powerview.data.BatteryLevel
 import com.scrivtech.powerview.data.LOW_BATTERY_PERCENT
 import com.scrivtech.powerview.data.ShadeMetadata
+import com.scrivtech.powerview.data.SweepInterval
 import com.scrivtech.powerview.data.batteryLevelOf
 
 /**
@@ -19,14 +20,26 @@ import com.scrivtech.powerview.data.batteryLevelOf
  */
 
 /**
+ * How old a reading has to be, with the sweep switched off, before its age
+ * is shown. Nothing is maintaining these numbers, so this is a judgement
+ * about when a battery reading stops meaning anything rather than a multiple
+ * of any schedule.
+ */
+internal const val UNSWEPT_STALE_DAYS: Long = 30
+
+/**
  * A reading older than this is shown with its age attached.
  *
- * Two sweep periods. `BatterySweepWorker` runs weekly, so one missed sweep
- * is ordinary — the phone was away from the shades, or the battery-not-low
- * constraint deferred it. Two means the number on screen is not being
- * maintained, and the user should know that before trusting it.
+ * Two sweep periods, so it follows the user's own setting rather than a
+ * fixed fortnight. One missed sweep is ordinary — the phone was away from
+ * the shades, or the battery-not-low constraint deferred it. Two means the
+ * number on screen is not being maintained, and the user should know that
+ * before trusting it. Pinning this to 14 days regardless would mark
+ * everything stale forever on a monthly sweep, and stay silent for a
+ * fortnight of failures on a daily one.
  */
-internal const val STALE_READING_DAYS: Long = 14
+internal fun staleAfterDays(interval: SweepInterval): Long =
+    interval.days?.let { (it * 2).coerceAtLeast(2) } ?: UNSWEPT_STALE_DAYS
 
 private const val MILLIS_PER_DAY: Long = 24L * 60 * 60 * 1000
 
@@ -39,8 +52,9 @@ internal data class BatteryRow(
     val level: BatteryLevel,
     /** Whole days since the reading, or null if it has never been read. */
     val ageDays: Long?,
+    /** Set by [batteryRows] against the sweep interval in force; see [staleAfterDays]. */
+    val stale: Boolean,
 ) {
-    val stale: Boolean get() = ageDays != null && ageDays >= STALE_READING_DAYS
     val low: Boolean get() = percent != null && percent <= LOW_BATTERY_PERCENT
 }
 
@@ -60,21 +74,25 @@ internal data class BatteryRow(
 internal fun batteryRows(
     shades: Collection<ShadeMetadata>,
     nowEpochMillis: Long,
+    staleAfterDays: Long,
 ): List<BatteryRow> =
     shades
         .filterNot { it.mainsPowered }
         .map { shade ->
+            val ageDays = shade.batteryReadAtEpochMillis?.let { readAt ->
+                // Negative ages happen: a clock moved backwards, or a
+                // restored backup. Report them as fresh rather than as a
+                // reading from the future.
+                ((nowEpochMillis - readAt) / MILLIS_PER_DAY).coerceAtLeast(0)
+            }
+
             BatteryRow(
                 macAddress = shade.macAddress,
                 label = shade.label,
                 percent = shade.batteryPercent,
                 level = batteryLevelOf(shade.batteryPercent),
-                ageDays = shade.batteryReadAtEpochMillis?.let { readAt ->
-                    // Negative ages happen: a clock moved backwards, or a
-                    // restored backup. Report them as fresh rather than as a
-                    // reading from the future.
-                    ((nowEpochMillis - readAt) / MILLIS_PER_DAY).coerceAtLeast(0)
-                },
+                ageDays = ageDays,
+                stale = ageDays != null && ageDays >= staleAfterDays,
             )
         }
         .sortedWith(
