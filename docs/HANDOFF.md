@@ -1,10 +1,15 @@
 # Handoff
 
-Written 2026-09-17 at the end of the fourth session, which is the first to run
-on the owner's build server rather than the sandboxed Claude Code container.
-Branch `claude/load-dev-skills-d0bioe` is this repository's **default branch**
-(there is no `main` or `master`, and no tags). The head, `238fbb5`, is green in
-CI, including full lint. No release has been tagged.
+Written 2026-09-17, updated mid-fifth-session. The fourth session was the
+first to run on the owner's build server rather than the sandboxed Claude Code
+container; the fifth is running there too. Branch
+`claude/load-dev-skills-d0bioe` is this repository's **default branch** (there
+is no `main` or `master`, and no tags). No release has been tagged.
+
+**The fifth session is a UI-quality pass, not build-order work** — see
+"Session 5" immediately below before anything else in this document. Steps 1–4
+and the build-order table further down describe state as of the end of
+session 4 and are otherwise still current.
 
 This is the state-of-play document for whoever picks the project up next. The
 README describes what the app is meant to be; this describes what is actually
@@ -81,6 +86,108 @@ Two things that are not build-order steps landed in the second session and
 are easy to miss in that table: a **theme picker** (Follow system / Light /
 Dark / Black (OLED)) and a **battery widget** with a **configurable sweep
 interval**. The CHANGELOG carries the design reasoning for each.
+
+---
+
+## Session 5: UI-quality pass (in progress)
+
+The user redirected from build-order step 5 to a UI overhaul: the app is
+functionally complete through step 4 but every screen is stock Material 3
+with no icons, no accent color, and navigation buried behind a single text
+"More" overflow menu — three things called out directly ("the UI needs a
+total overhaul, there are no notification settings, and the widget is far too
+large and can't be resized"). **Step 5 is still next once this is done** — it
+was not pulled forward, and nothing about it changed.
+
+A plan was written and approved before any code changed (Claude Code's plan
+mode). Two decisions the user made explicitly, worth keeping if this session
+gets interrupted: **add a real accent color** (not staying neutral, not
+wallpaper-derived dynamic color), and **phased delivery** — each phase gets
+its own build/verify/commit before the next starts, rather than one large
+change.
+
+### The four phases
+
+1. **Notification settings** — ✅ done, committed `29e5961`, pushed.
+   `SettingsStore` gained a fourth preference, `notificationsEnabled`
+   (default true, same `Flow`/suspend-setter/`distinctUntilChanged` shape as
+   the other three). `BatterySweepWorker` checks it immediately before the
+   `BatteryNotifier` call and nowhere else — sweeps and readings are
+   unaffected by the toggle, only the notification is. Settings screen got a
+   toggle plus a link to `Settings.ACTION_APP_NOTIFICATION_SETTINGS` for
+   sound/vibration/importance, which live in system settings for this app's
+   one notification channel.
+
+2. **Widget resize fix** — built and verified, **not yet committed** as of
+   this writing. Root cause: neither `ShadeActionWidget` nor `BatteryWidget`
+   overrode `GlanceAppWidget.sizeMode`, so Glance defaulted to
+   `SizeMode.Single` — it composes **once**, at the widget's initial size,
+   and never again. The manifest XML (`resizeMode="horizontal|vertical"` in
+   both `*_widget_info.xml`) tells the *launcher* resizing is allowed, but
+   nothing on the Glance side ever reacted to it, so the content was frozen
+   at whatever size it first rendered — which is exactly "too large and
+   can't be resized." Fix: both widgets now override
+   `sizeMode = SizeMode.Responsive(...)` with a curated set of `DpSize`
+   breakpoints (cell math `70dp * cells - 30dp`, which lines up exactly with
+   `battery_widget_info.xml`'s declared 180x110dp minimum at 3x2 cells).
+   `BatteryWidget` additionally reads `LocalSize.current.height` and feeds it
+   into `batteryRowsToShow`'s existing `max` parameter (`maxRowsForHeight` in
+   `BatteryWidget.kt`), so the row count adapts to the widget's actual size
+   instead of clipping at the old fixed `MAX_BATTERY_ROWS = 5`.
+   Resumed on 2026-09-18: `maxRowsForHeight` now takes the total row count
+   and, when rows will be hidden, reserves room for the "N more — open the
+   app" line first — at the 110dp minimum the old version showed two rows
+   and clipped that line, the one telling you the list is incomplete. Row
+   height estimate corrected 22dp → 24dp; `BatteryWidgetSizeTest` covers it.
+   `ShadeActionWidget`'s grid stays driven by slot count, which is a content
+   decision, not a size one, and was already correct. **Device check owed**:
+   place both widgets, drag the resize handles through a few sizes, confirm
+   content reflows instead of clipping — nothing about resizing can be
+   confirmed from the build server.
+
+3. **Navigation restructure** — not started. Bottom `NavigationBar`
+   (Shades/Actions/Settings) replacing the text "More" `DropdownMenu`; Raw
+   scan moves out of top-level nav into Settings as a "Developer" section
+   entry (it's a hardware-verification tool, not a destination a shade owner
+   needs daily); real `Icons.AutoMirrored.Filled.ArrowBack` icon button
+   replacing the text "Back" `TextButton`. **Deliberately keeping the
+   hand-rolled `route`/`selectedMac` state in `PowerViewApp.kt` rather than
+   adopting `navigation-compose`** — it's pinned in the catalog but has never
+   once been resolved by a build in this project's history, and a bottom nav
+   plus one level of push screens is still comfortably within what the
+   current approach handles. Recorded as a decision, not an oversight; the
+   existing code comment about swapping it in "when the graph is big enough
+   to earn it" still stands for later.
+
+4. **Visual design refresh** — not started. Adds
+   `androidx.compose.material:material-icons-core` (BOM-versioned, no
+   separate pin) for real icons throughout — bottom nav, back arrow, the
+   `ActionIcon` picker (`UP`/`DOWN`/`STOP`/`HALF`/`CUSTOM`) in
+   `ActionEditorScreen.kt`, currently a row of text-label buttons because
+   "the project pulls in no icon dependency" (a documented choice this phase
+   deliberately reverses). Hand-authored Light/Dark `ColorScheme`s in
+   `PowerViewTheme.kt` from a chosen accent seed hue, with `OledScheme`
+   re-derived from the new `DarkScheme` the same way it already is today.
+   Layout polish (card elevation/spacing, icon-leading headers, a FAB for
+   "New action") scoped to refinement, not re-architecting any screen's
+   layout. This is the phase where "does it actually look better" can only
+   be judged on a phone — mandatory device review across all four themes
+   before it's considered done.
+
+### Gate notes for this session
+
+Each phase runs the full CI task list locally
+(`./gradlew :protocol:test assembleDebug test assembleRelease lint`) before
+being proposed for commit — nothing deferred to "CI will catch it." Phase 1:
+141 tests, 0 failures, clean lint, R8 release build green. Phase 2: same full
+build green; `:widget`'s 50 tests (unaffected modules skipped by Gradle's
+UP-TO-DATE checking, which is correct here — only `:widget` changed) also 0
+failures. `.claude/dev-skills-gates.md` carries the live gate state and is
+more current than this section by construction — read it first if resuming.
+
+If this session ends mid-phase, the plan above (phases, file lists, the
+`sizeMode`/`maxRowsForHeight` reasoning, the navigation-compose decision) is
+everything needed to resume without re-deriving it from the diff.
 
 ---
 

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -15,6 +16,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
@@ -38,6 +40,22 @@ import com.scrivtech.powerview.data.ActionStore
 import com.scrivtech.powerview.data.ShadeAction
 
 /**
+ * The declared sizes [SizeMode.Responsive] composes for, spanning
+ * `shade_action_widget_info.xml`'s `minWidth`/`minHeight` (one cell) up to a
+ * 3x2 grid — the largest [gridColumns] ever returns for [MAX_WIDGET_ACTIONS].
+ * Approximate cell math (`70dp * cells - 30dp`), not measured against a real
+ * launcher: Glance snaps to the nearest declared size, so precision here
+ * matters less than covering the practical range.
+ */
+private val WIDGET_SIZES = setOf(
+    DpSize(57.dp, 57.dp),
+    DpSize(130.dp, 57.dp),
+    DpSize(130.dp, 130.dp),
+    DpSize(203.dp, 130.dp),
+    DpSize(203.dp, 203.dp),
+)
+
+/**
  * The home-screen widget: one to six buttons, each running a saved
  * [ShadeAction] (build order step 9, spec §3.2-§3.4).
  *
@@ -57,8 +75,17 @@ import com.scrivtech.powerview.data.ShadeAction
  * `GlanceTheme` follows the launcher (dynamic colour on API 31+) rather than
  * the app's own theme setting. A widget sits on someone else's wallpaper; the
  * black OLED scheme would be wrong there as often as it was right.
+ *
+ * [sizeMode] is [SizeMode.Responsive] rather than the default
+ * [SizeMode.Single]: without it Glance composes once, at whichever size the
+ * widget first rendered at, and never again — the launcher's resize handles
+ * move, but nothing about the content follows, which reads as a widget that
+ * cannot be resized. [WIDGET_SIZES] spans one cell up to the 6-button cap
+ * ([MAX_WIDGET_ACTIONS]), so every configured size gets its own composition.
  */
 public class ShadeActionWidget : GlanceAppWidget() {
+
+    override val sizeMode: SizeMode = SizeMode.Responsive(WIDGET_SIZES)
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         // Resolves to the same process-wide DataStore the rest of the app
