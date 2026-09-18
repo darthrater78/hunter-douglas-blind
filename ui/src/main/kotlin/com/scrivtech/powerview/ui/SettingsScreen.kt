@@ -1,5 +1,6 @@
 package com.scrivtech.powerview.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -12,13 +13,16 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.scrivtech.powerview.data.ShadeAction
@@ -50,6 +54,7 @@ public fun SettingsScreen(
     notificationsEnabled: Boolean,
     onNotificationsEnabledChange: (Boolean) -> Unit,
     onOpenSystemNotificationSettings: () -> Unit,
+    onOpenRawScan: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -190,6 +195,46 @@ public fun SettingsScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+
+        item(key = "developer-header") {
+            Text(
+                "Developer",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(top = 16.dp),
+            )
+        }
+
+        item(key = "developer-raw-scan") {
+            // Kept reachable because it is the tool that confirmed the
+            // advertisement offsets against hardware, and the open questions
+            // in docs/PROTOCOL.md §8 mean it is not finished being useful.
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(role = Role.Button, onClick = onOpenRawScan)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_developer_mode),
+                        contentDescription = null,
+                    )
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text("Raw scan", style = MaterialTheme.typography.bodyLarge)
+                        Text(
+                            "Every advertisement in range, raw bytes beside the decoded fields.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Icon(
+                        painter = painterResource(R.drawable.ic_chevron_right),
+                        contentDescription = null,
+                    )
                 }
             }
         }

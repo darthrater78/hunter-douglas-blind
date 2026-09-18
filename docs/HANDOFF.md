@@ -139,13 +139,32 @@ change.
    app" line first — at the 110dp minimum the old version showed two rows
    and clipped that line, the one telling you the list is incomplete. Row
    height estimate corrected 22dp → 24dp; `BatteryWidgetSizeTest` covers it.
+   **Device check found the real floor, same day:** the battery widget
+   resized only *upward*. `battery_widget_info.xml` set `minWidth`/`minHeight`
+   to its 3x2 default and no `minResizeWidth`/`minResizeHeight`, and Android
+   treats min size as the resize floor when those are absent — `sizeMode` was
+   necessary but not sufficient. It now declares `minResizeWidth="110dp"`
+   `minResizeHeight="40dp"` (2x1) while still landing at 3x2, and below 80dp
+   tall (`SUMMARY_ONLY_HEIGHT`) it draws only the one-line summary. The action
+   widget's minimum is already one cell, so it had no floor problem.
    `ShadeActionWidget`'s grid stays driven by slot count, which is a content
    decision, not a size one, and was already correct. **Device check owed**:
    place both widgets, drag the resize handles through a few sizes, confirm
    content reflows instead of clipping — nothing about resizing can be
    confirmed from the build server.
 
-3. **Navigation restructure** — not started. Bottom `NavigationBar`
+3. **Navigation restructure** — built and verified 2026-09-18, awaiting
+   commit. Bottom `NavigationBar` (Shades/Actions/Settings, outlined icon
+   swapping to filled when selected) replaces the "More" menu and is hidden
+   on pushed screens (shade detail, raw scan, action editor), which get an
+   arrow-icon back button instead. Back from raw scan returns to Settings;
+   back from Actions or Settings returns to Shades, as before. Raw scan lives
+   in a new "Developer" section at the bottom of Settings. **Icons are
+   Material Symbols vector drawables** in `ui/src/main/res/drawable`
+   (`android:tint` stripped; Compose's `Icon` tints them), not
+   `material-icons-core` — the user chose this on 2026-09-18 once it turned
+   out that library's last release was 1.7.8 in Feb 2025. Phase 4 adds
+   further icons the same way. Original plan text, kept for the reasoning: Bottom `NavigationBar`
    (Shades/Actions/Settings) replacing the text "More" `DropdownMenu`; Raw
    scan moves out of top-level nav into Settings as a "Developer" section
    entry (it's a hardware-verification tool, not a destination a shade owner
@@ -160,8 +179,8 @@ change.
    to earn it" still stands for later.
 
 4. **Visual design refresh** — not started. Adds
-   `androidx.compose.material:material-icons-core` (BOM-versioned, no
-   separate pin) for real icons throughout — bottom nav, back arrow, the
+   Material Symbols vector drawables (see phase 3 — *not*
+   `material-icons-core`, as first planned) for real icons throughout — bottom nav, back arrow, the
    `ActionIcon` picker (`UP`/`DOWN`/`STOP`/`HALF`/`CUSTOM`) in
    `ActionEditorScreen.kt`, currently a row of text-label buttons because
    "the project pulls in no icon dependency" (a documented choice this phase

@@ -41,11 +41,15 @@ import com.scrivtech.powerview.data.SweepInterval
 
 /**
  * The declared sizes [SizeMode.Responsive] composes for. Approximate cell
- * math (`70dp * cells - 30dp`) matches `battery_widget_info.xml`'s
- * `minWidth`/`minHeight` (3x2 cells = 180x110dp) exactly at the small end,
- * then spans up toward a size that can show several rows comfortably.
+ * math (`70dp * cells - 30dp`): the one-cell-high strips match
+ * `battery_widget_info.xml`'s `minResizeWidth`/`minResizeHeight` (2x1 =
+ * 110x40dp), 180x110dp is its 3x2 default, and the rest span up toward a size
+ * that can show several rows comfortably.
  */
 private val BATTERY_WIDGET_SIZES = setOf(
+    DpSize(110.dp, 40.dp),
+    DpSize(180.dp, 40.dp),
+    DpSize(250.dp, 40.dp),
     DpSize(110.dp, 110.dp),
     DpSize(180.dp, 110.dp),
     DpSize(180.dp, 180.dp),
@@ -65,6 +69,9 @@ private const val HEADER_OVERHEAD_DP: Float = 54f
 /** The "N more — open the app" line: 11sp text plus its 4dp top padding. */
 private const val OVERFLOW_LINE_DP: Float = 20f
 
+/** Below this, only the summary line fits, so the widget shows just that line with tighter padding. */
+private val SUMMARY_ONLY_HEIGHT = 80.dp
+
 /**
  * How many of [totalRows] [BatteryRow]s to show in [height], replacing the
  * old size-blind [MAX_BATTERY_ROWS] constant now that this widget actually
@@ -72,7 +79,9 @@ private const val OVERFLOW_LINE_DP: Float = 20f
  *
  * When not every row fits, room is kept for the overflow line first: that
  * line is what says the list is incomplete, so it is the last thing that
- * should be clipped off the bottom. Bounded above by twice
+ * should be clipped off the bottom. Zero means only the summary line fits —
+ * a 2x1 strip — and the summary already says how many are low, so nothing
+ * is lost that the app does not hold. Bounded above by twice
  * [MAX_BATTERY_ROWS]: a very tall widget is still a glance, not a scrolling
  * list, so more room buys more rows only up to a point.
  */
@@ -84,7 +93,7 @@ internal fun maxRowsForHeight(height: Dp, totalRows: Int): Int {
     } else {
         ((available - OVERFLOW_LINE_DP).coerceAtLeast(0f) / ROW_HEIGHT_DP).toInt()
     }
-    return rows.coerceIn(1, MAX_BATTERY_ROWS * 2)
+    return rows.coerceIn(0, MAX_BATTERY_ROWS * 2)
 }
 
 /**
@@ -152,7 +161,9 @@ public class BatteryWidget : GlanceAppWidget() {
             // How many rows fit follows the widget's actual current size
             // rather than a size-blind constant, now that SizeMode.Responsive
             // means this composes again on every resize.
-            val maxRows = maxRowsForHeight(LocalSize.current.height, rows.size)
+            val height = LocalSize.current.height
+            val maxRows = maxRowsForHeight(height, rows.size)
+            val summaryOnly = height < SUMMARY_ONLY_HEIGHT
 
             GlanceTheme {
                 Column(
@@ -160,13 +171,14 @@ public class BatteryWidget : GlanceAppWidget() {
                         .fillMaxSize()
                         .background(GlanceTheme.colors.widgetBackground)
                         .cornerRadius(16.dp)
-                        .padding(12.dp)
+                        .padding(horizontal = 12.dp, vertical = if (summaryOnly) 6.dp else 12.dp)
                         .let { base ->
                             if (openApp == null) base else base.clickable(actionStartActivity(openApp))
                         },
                 ) {
                     Text(
                         text = batterySummaryLine(rows),
+                        maxLines = if (summaryOnly) 1 else Int.MAX_VALUE,
                         style = TextStyle(
                             color = GlanceTheme.colors.onSurface,
                             fontSize = 14.sp,
@@ -174,33 +186,36 @@ public class BatteryWidget : GlanceAppWidget() {
                         ),
                     )
 
-                    Spacer(modifier = GlanceModifier.size(6.dp))
+                    // A one-cell strip: the summary line is the whole widget.
+                    if (!summaryOnly) {
+                        Spacer(modifier = GlanceModifier.size(6.dp))
 
-                    if (rows.isEmpty()) {
-                        Text(
-                            text = NO_BATTERY_SHADES_TEXT,
-                            style = TextStyle(
-                                color = GlanceTheme.colors.onSurfaceVariant,
-                                fontSize = 12.sp,
-                            ),
-                        )
-                    } else {
-                        val shown = batteryRowsToShow(rows, max = maxRows)
-
-                        for (row in shown.rows) {
-                            BatteryRowView(row)
-                        }
-
-                        hiddenRowsText(shown.hidden)?.let { overflow ->
+                        if (rows.isEmpty()) {
                             Text(
-                                text = overflow,
-                                maxLines = 1,
-                                modifier = GlanceModifier.padding(top = 4.dp),
+                                text = NO_BATTERY_SHADES_TEXT,
                                 style = TextStyle(
                                     color = GlanceTheme.colors.onSurfaceVariant,
-                                    fontSize = 11.sp,
+                                    fontSize = 12.sp,
                                 ),
                             )
+                        } else {
+                            val shown = batteryRowsToShow(rows, max = maxRows)
+
+                            for (row in shown.rows) {
+                                BatteryRowView(row)
+                            }
+
+                            hiddenRowsText(shown.hidden)?.let { overflow ->
+                                Text(
+                                    text = overflow,
+                                    maxLines = 1,
+                                    modifier = GlanceModifier.padding(top = 4.dp),
+                                    style = TextStyle(
+                                        color = GlanceTheme.colors.onSurfaceVariant,
+                                        fontSize = 11.sp,
+                                    ),
+                                )
+                            }
                         }
                     }
                 }

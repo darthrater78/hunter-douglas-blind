@@ -2,21 +2,23 @@ package com.scrivtech.powerview.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.annotation.DrawableRes
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import com.scrivtech.powerview.data.SweepInterval
 import com.scrivtech.powerview.data.ThemeMode
 
@@ -26,6 +28,20 @@ private const val ROUTE_ACTIONS = "actions"
 private const val ROUTE_DEBUG = "debug"
 private const val ROUTE_SETTINGS = "settings"
 
+/** One bottom-bar destination: the route it opens and its outlined/filled icon pair. */
+private data class Tab(
+    val route: String,
+    val label: String,
+    @param:DrawableRes val icon: Int,
+    @param:DrawableRes val selectedIcon: Int,
+)
+
+private val TABS = listOf(
+    Tab(ROUTE_SHADES, "Shades", R.drawable.ic_roller_shades, R.drawable.ic_roller_shades_fill1),
+    Tab(ROUTE_ACTIONS, "Actions", R.drawable.ic_play_circle, R.drawable.ic_play_circle_fill1),
+    Tab(ROUTE_SETTINGS, "Settings", R.drawable.ic_settings, R.drawable.ic_settings_fill1),
+)
+
 /**
  * The app's root. Screen state is a saved route string plus an optional MAC
  * rather than a `NavHost`: at this size that is less code than wiring
@@ -34,6 +50,14 @@ private const val ROUTE_SETTINGS = "settings"
  * so its pin has never been resolved by a build — worth avoiding in the same
  * change that introduces new screens. Swap it in when the graph is big enough
  * to earn it; nothing here depends on staying hand-rolled.
+ *
+ * Shades, Actions and Settings are the three top-level destinations, on a
+ * bottom bar. Everything else is pushed on top of one of them and hides the
+ * bar while it is open: a shade's detail over Shades, the raw scan over
+ * Settings (it is a hardware-verification tool, not somewhere a shade owner
+ * goes daily, so it lives in Settings' Developer section rather than on the
+ * bar), and the action editor over Actions. Back leaves a pushed screen for
+ * the tab under it, and leaves Actions or Settings for Shades.
  *
  * The action editor is not a route of its own. It is shown whenever
  * [ActionsViewModel] holds a draft, so "is an edit in progress" has exactly one
@@ -86,10 +110,19 @@ public fun PowerViewApp(
         selectedMac = null
     }
 
+    val editing = draft != null && currentRoute == ROUTE_ACTIONS
+    val pushed = editing || currentRoute == ROUTE_DETAIL || currentRoute == ROUTE_DEBUG
+
     // An open editor is what Back closes first; only then does the route change.
-    BackHandler(enabled = currentRoute != ROUTE_SHADES || draft != null) {
-        if (draft != null) actionsViewModel.cancelEdit() else goToShades()
+    fun goBack() {
+        when {
+            draft != null -> actionsViewModel.cancelEdit()
+            currentRoute == ROUTE_DEBUG -> route = ROUTE_SETTINGS
+            else -> goToShades()
+        }
     }
+
+    BackHandler(enabled = currentRoute != ROUTE_SHADES || draft != null) { goBack() }
 
     Scaffold(
         modifier = modifier,
@@ -98,7 +131,7 @@ public fun PowerViewApp(
                 title = {
                     Text(
                         when {
-                            draft != null && currentRoute == ROUTE_ACTIONS -> "Edit action"
+                            editing -> "Edit action"
                             currentRoute == ROUTE_DETAIL -> selectedShade?.label.orEmpty()
                             currentRoute == ROUTE_ACTIONS -> "Actions"
                             currentRoute == ROUTE_DEBUG -> "Raw scan"
@@ -108,57 +141,39 @@ public fun PowerViewApp(
                     )
                 },
                 navigationIcon = {
-                    if (currentRoute != ROUTE_SHADES || draft != null) {
-                        TextButton(
-                            onClick = {
-                                if (draft != null) actionsViewModel.cancelEdit() else goToShades()
-                            },
-                        ) {
-                            Text("Back")
-                        }
-                    }
-                },
-                actions = {
-                    if (currentRoute == ROUTE_SHADES) {
-                        // An overflow rather than a row of text buttons: there
-                        // are three destinations now, and three labels do not
-                        // fit an app bar on a phone. The project pulls in no
-                        // icon dependency, so the trigger is a word.
-                        var menuOpen by remember { mutableStateOf(false) }
-
-                        TextButton(onClick = { menuOpen = true }) { Text("More") }
-
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Actions") },
-                                onClick = {
-                                    menuOpen = false
-                                    route = ROUTE_ACTIONS
-                                },
-                            )
-                            // The debug screen stays reachable: it is the tool
-                            // that confirmed the advertisement offsets against
-                            // hardware, and the open questions in
-                            // docs/PROTOCOL.md §8 mean it is not finished being
-                            // useful.
-                            DropdownMenuItem(
-                                text = { Text("Raw scan") },
-                                onClick = {
-                                    menuOpen = false
-                                    route = ROUTE_DEBUG
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Settings") },
-                                onClick = {
-                                    menuOpen = false
-                                    route = ROUTE_SETTINGS
-                                },
+                    if (pushed) {
+                        IconButton(onClick = ::goBack) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_arrow_back),
+                                contentDescription = "Back",
                             )
                         }
                     }
                 },
             )
+        },
+        bottomBar = {
+            if (!pushed) {
+                NavigationBar {
+                    for (tab in TABS) {
+                        val selected = tab.route == currentRoute
+                        NavigationBarItem(
+                            selected = selected,
+                            onClick = {
+                                route = tab.route
+                                selectedMac = null
+                            },
+                            icon = {
+                                Icon(
+                                    painter = painterResource(if (selected) tab.selectedIcon else tab.icon),
+                                    contentDescription = null,
+                                )
+                            },
+                            label = { Text(tab.label) },
+                        )
+                    }
+                }
+            }
         },
     ) { contentPadding ->
         val content = Modifier.padding(contentPadding)
@@ -178,6 +193,7 @@ public fun PowerViewApp(
                 notificationsEnabled = notificationsEnabled,
                 onNotificationsEnabledChange = onNotificationsEnabledChange,
                 onOpenSystemNotificationSettings = onOpenSystemNotificationSettings,
+                onOpenRawScan = { route = ROUTE_DEBUG },
                 modifier = content,
             )
 

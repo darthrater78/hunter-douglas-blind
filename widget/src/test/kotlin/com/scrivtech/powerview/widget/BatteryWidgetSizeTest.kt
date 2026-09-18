@@ -30,8 +30,14 @@ class BatteryWidgetSizeTest {
     }
 
     @Test
-    fun `never fewer than one row, however small`() {
-        assertEquals(1, maxRowsForHeight(0.dp, totalRows = 3))
+    fun `a one-cell strip shows no rows, only the summary line`() {
+        // battery_widget_info.xml's minResizeHeight.
+        assertEquals(0, maxRowsForHeight(40.dp, totalRows = 3))
+    }
+
+    @Test
+    fun `never negative, however small`() {
+        assertEquals(0, maxRowsForHeight(0.dp, totalRows = 3))
     }
 
     @Test

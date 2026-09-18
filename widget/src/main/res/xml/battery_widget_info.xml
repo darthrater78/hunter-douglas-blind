@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Wider and taller minimum than the action widget: this one lists shades with
-  a label and a reading each, and at one cell it could show neither.
+  Wider and taller default than the action widget: this one lists shades with
+  a label and a reading each. minWidth/minHeight (3x2) are where it lands when
+  placed; minResizeWidth/minResizeHeight let it shrink from there to a 2x1
+  strip showing only the summary line. Without them Android treats minWidth/
+  minHeight as the floor, so the widget could grow but never shrink.
 
   No android:configure — there is nothing to configure. It shows every
   battery-powered shade the app knows about, worst first, so it needs no
@@ -17,6 +20,8 @@
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="180dp"
     android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="40dp"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="3"
     android:targetCellHeight="2"
